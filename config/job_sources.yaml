@@ -1,0 +1,188 @@
+keywords:
+  - "AI Engineer"
+  - "LLMOps Engineer"
+  - "Python Senior Developer"
+  - "AI Enablement Engineer"
+  - "Machine Learning Engineer"
+  - "Senior AI Developer"
+  - "MLOps Engineer"
+  - "AI/ML Engineer"
+  - "Full Stack AI Developer"
+  - "Senior Python Developer"
+  - "Cloud AI Engineer"
+
+filters:
+  employment_type:
+    - "part-time"
+    - "contract"
+    - "freelance"
+    - "temporary"
+  location:
+    - "remote"
+    - "anywhere"
+    - "work from home"
+  experience_level:
+    - "senior"
+    - "lead"
+    - "principal"
+
+skills_required:
+  - "Python"
+  - "AI"
+  - "Machine Learning"
+  - "LLM"
+  - "LLMOps"
+  - "AWS"
+  - "GCP"
+  - "Django"
+  - "FastAPI"
+  - "n8n"
+  - "Docker"
+  - "Kubernetes"
+
+# Preferencias de idioma - Priorizar español, no requerir inglés fluido
+language_preferences:
+  # Idiomas preferidos (bonus)
+  preferred_languages:
+    - "spanish"
+    - "español"
+    - "spanish speaking"
+    - "hispanohablante"
+  
+  # Keywords que indican que NO requieren inglés fluido (bonus)
+  acceptable_english:
+    - "intermediate english"
+    - "english intermediate"
+    - "basic english"
+    - "english not required"
+    - "bilingual preferred"
+    - "conversational english"
+    - "good english"
+    - "working english"
+    - "english is a plus"
+    - "english preferred"
+  
+  # Keywords que indican inglés fluido requerido (penalización)
+  fluent_english_required:
+    - "fluent english"
+    - "native english"
+    - "english native"
+    - "advanced english required"
+    - "c1 english"
+    - "c2 english"
+    - "english proficiency required"
+    - "excellent english"
+    - "perfect english"
+    - "native-level english"
+    - "english must be fluent"
+    - "fluent in english required"
+    - "english fluency required"
+  
+  # Regiones/empresas preferidas (bonus por ser LATAM o España)
+  preferred_regions:
+    - "latin america"
+    - "latam"
+    - "south america"
+    - "colombia"
+    - "mexico"
+    - "méxico"
+    - "argentina"
+    - "chile"
+    - "peru"
+    - "perú"
+    - "spain"
+    - "españa"
+    - "ecuador"
+    - "uruguay"
+    - "costa rica"
+    - "panama"
+    - "panamá"
+
+# Regiones de búsqueda - Priorizar países hispanos, luego angloparlantes
+search_regions:
+  # Primera fase: Países hispanos (prioridad)
+  hispanic_countries:
+    - "Colombia"
+    - "México"
+    - "Argentina"
+    - "Chile"
+    - "Perú"
+    - "España"
+    - "Ecuador"
+    - "Uruguay"
+    - "Costa Rica"
+    - "Panamá"
+    - "Venezuela"
+    - "Guatemala"
+  
+  # Segunda fase: Países angloparlantes
+  english_countries:
+    - "United States"
+    - "USA"
+    - "United Kingdom"
+    - "UK"
+    - "Canada"
+    - "Australia"
+    - "New Zealand"
+    - "Ireland"
+    - "South Africa"
+  
+  # Códigos de país para APIs (si aplica)
+  country_codes:
+    colombia: "co"
+    mexico: "mx"
+    argentina: "ar"
+    spain: "es"
+    usa: "us"
+    uk: "gb"
+    canada: "ca"
+    australia: "au"
+
+job_sources:
+  linkedin:
+    enabled: true
+    use_api: false
+    max_results: 50
+    base_url: "https://www.linkedin.com/jobs/search"
+
+  indeed:
+    enabled: false  # Deshabilitado: difícil acceso, bloqueos frecuentes
+    use_api: false
+    max_results: 50
+    base_url: "https://www.indeed.com/jobs"
+
+  remoteok:
+    enabled: true
+    use_api: true
+    max_results: 100
+    base_url: "https://remoteok.com/api"
+
+  we_work_remotely:
+    enabled: true
+    use_api: false
+    max_results: 50
+    base_url: "https://weworkremotely.com"
+
+  stack_overflow:
+    enabled: true
+    use_api: true
+    max_results: 50
+    base_url: "https://stackoverflow.com/jobs/feed"
+
+  github_jobs:
+    enabled: true
+    use_api: false
+    max_results: 30
+    base_url: "https://jobs.github.com/positions.json"
+
+  wellfound:
+    enabled: true
+    use_api: false
+    max_results: 30
+    base_url: "https://wellfound.com/jobs"
+
+  findjobit:
+    enabled: true
+    use_api: false
+    max_results: 50
+    base_url: "https://findjobit.com"

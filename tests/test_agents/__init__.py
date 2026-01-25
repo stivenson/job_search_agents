@@ -1,0 +1,1 @@
+"""Tests agents inicialización."""

@@ -1,0 +1,58 @@
+{
+  "personal_info": {
+    "email": "your_email@example.com",
+    "github": "https://github.com/yourusername",
+    "portfolio": "https://yourportfolio.com",
+    "name": "Your Name"
+  },
+  "summary": "Your professional summary here. This will be used for job matching.",
+  "experience": [
+    {
+      "company": "Company Name",
+      "title": "Job Title",
+      "period": "Start Date - End Date",
+      "description": "Job description and responsibilities",
+      "bullets": [
+        "Key achievement or responsibility 1",
+        "Key achievement or responsibility 2"
+      ],
+      "technologies": [
+        "Python",
+        "JavaScript",
+        "AWS"
+      ]
+    }
+  ],
+  "skills": {
+    "Programming Languages and Frameworks": [
+      "Python - EXPERT - 4+ years",
+      "JavaScript - COMPETENT"
+    ]
+  },
+  "education": [
+    {
+      "institution": "University Name",
+      "degree": "Degree Name",
+      "period": "Start Year - End Year",
+      "details": "Additional details about your education"
+    }
+  ],
+  "projects": [
+    {
+      "name": "Project Name",
+      "context": "Personal Project / Work Project",
+      "period": "2024 - Present",
+      "description": "Project description and key features",
+      "technologies": [
+        "Technology1",
+        "Technology2"
+      ]
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Certification Name",
+      "details": "Completed Date"
+    }
+  ]
+}
