@@ -250,7 +250,7 @@ class IndeedAPIClient:
                 'publisher': self.api_key,
                 'q': ' OR '.join(keywords) if keywords else '',
                 'l': location or 'Remote',  # Usar location si se proporciona, sino 'Remote'
-                'jt': 'parttime',
+                'jt': 'fulltime',
                 'limit': min(max_results, 25),  # API limit
                 'format': 'json'
             }

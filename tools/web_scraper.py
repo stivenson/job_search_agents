@@ -633,7 +633,7 @@ async def scrape_indeed_jobs(keywords: List[str], max_results: int = 50, locatio
             params = {
                 'q': keyword,
                 'l': location or 'remote',  # Usar location si se proporciona, sino 'remote'
-                'jt': 'parttime',
+                'jt': 'fulltime',
                 'limit': 25
             }
             

@@ -28,6 +28,19 @@ class MatcherAgent:
         # Cargar configuración de preferencias de idioma
         self.language_prefs = self._load_language_preferences()
         
+        # Cargar configuración de matching
+        self.matching_config = self._load_matching_config()
+        
+        # Inicializar valores por defecto si no hay configuración
+        self.scoring_weights = self._get_scoring_weights()
+        self.employment_type_terms = self._get_employment_type_terms()
+        self.employment_type_scores = self._get_employment_type_scores()
+        self.location_terms = self._get_location_terms()
+        self.location_scores = self._get_location_scores()
+        self.experience_level_terms = self._get_experience_level_terms()
+        self.experience_level_scores = self._get_experience_level_scores()
+        self.relevant_keywords = self._get_relevant_keywords()
+        
         # Inicializar embeddings (requiere OpenAI para embeddings)
         if OPENAI_API_KEY:
             self.embeddings = OpenAIEmbeddings()
@@ -58,6 +71,119 @@ class MatcherAgent:
                 logger.warning(f"Error cargando preferencias de idioma: {e}")
                 return {}
         return {}
+    
+    def _load_matching_config(self) -> Dict:
+        """Carga configuración de matching desde job_sources.yaml."""
+        config_path = Path(__file__).parent.parent / "config" / "job_sources.yaml"
+        if config_path.exists():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                return config.get('matching', {})
+            except Exception as e:
+                logger.warning(f"Error cargando configuración de matching: {e}")
+                return {}
+        return {}
+    
+    def _get_scoring_weights(self) -> Dict[str, int]:
+        """Obtiene pesos de scoring con valores por defecto."""
+        weights = self.matching_config.get('scoring_weights', {})
+        return {
+            'skills_match': weights.get('skills_match', 35),
+            'employment_type': weights.get('employment_type', 15),
+            'location': weights.get('location', 15),
+            'experience_level': weights.get('experience_level', 10),
+            'relevant_keywords': weights.get('relevant_keywords', 10),
+            'language_region': weights.get('language_region', 15)
+        }
+    
+    def _get_employment_type_terms(self) -> Dict[str, List[str]]:
+        """Obtiene términos de tipo de empleo con valores por defecto."""
+        terms = self.matching_config.get('employment_type_terms', {})
+        return {
+            'full_time': terms.get('full_time', ['full-time', 'fulltime', 'full time', 'permanent']),
+            'part_time': terms.get('part_time', ['part-time', 'part time', 'parttime']),
+            'contract': terms.get('contract', ['contract', 'contractor', 'contracting']),
+            'freelance': terms.get('freelance', ['freelance', 'freelancer', 'freelancing'])
+        }
+    
+    def _get_employment_type_scores(self) -> Dict[str, int]:
+        """Obtiene scores de tipo de empleo con valores por defecto."""
+        scores = self.matching_config.get('employment_type_scores', {})
+        return {
+            'full_time': scores.get('full_time', 15),
+            'part_time': scores.get('part_time', 4),
+            'contract': scores.get('contract', 4),
+            'freelance': scores.get('freelance', 4),
+            'neutral': scores.get('neutral', 8)
+        }
+    
+    def _get_location_terms(self) -> Dict[str, List[str]]:
+        """Obtiene términos de ubicación con valores por defecto."""
+        terms = self.matching_config.get('location_terms', {})
+        return {
+            'remote': terms.get('remote', ['remote', 'anywhere', 'work from home', 'wfh', 'distributed']),
+            'occasional_travel': terms.get('occasional_travel', ['occasional travel', 'travel occasionally', 'some travel'])
+        }
+    
+    def _get_location_scores(self) -> Dict[str, int]:
+        """Obtiene scores de ubicación con valores por defecto."""
+        scores = self.matching_config.get('location_scores', {})
+        return {
+            'remote': scores.get('remote', 15),
+            'occasional_travel': scores.get('occasional_travel', 12),
+            'other': scores.get('other', 0)
+        }
+    
+    def _get_experience_level_terms(self) -> Dict[str, List[str]]:
+        """Obtiene términos de nivel de experiencia con valores por defecto."""
+        terms = self.matching_config.get('experience_level_terms', {})
+        return {
+            'senior': terms.get('senior', ['senior', 'lead', 'principal', 'expert', 'staff']),
+            'mid': terms.get('mid', ['mid', 'intermediate', 'mid-level']),
+            'junior': terms.get('junior', ['junior', 'entry', 'associate'])
+        }
+    
+    def _get_experience_level_scores(self) -> Dict[str, int]:
+        """Obtiene scores de nivel de experiencia con valores por defecto."""
+        scores = self.matching_config.get('experience_level_scores', {})
+        return {
+            'senior': scores.get('senior', 10),
+            'mid': scores.get('mid', 5),
+            'junior': scores.get('junior', 3)
+        }
+    
+    def _get_relevant_keywords(self) -> List[str]:
+        """Obtiene keywords relevantes, infiriendo de YAML si está vacío."""
+        configured_keywords = self.matching_config.get('relevant_keywords', [])
+        
+        # Si hay keywords configurados, usarlos
+        if configured_keywords:
+            return [kw.lower() for kw in configured_keywords]
+        
+        # Si no, inferir de keywords + skills_required del YAML principal
+        config_path = Path(__file__).parent.parent / "config" / "job_sources.yaml"
+        if config_path.exists():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                
+                keywords = config.get('keywords', [])
+                skills_required = config.get('skills_required', [])
+                
+                # Combinar y extraer palabras clave
+                all_keywords = set()
+                for kw in keywords + skills_required:
+                    # Extraer palabras individuales de frases
+                    words = kw.lower().split()
+                    all_keywords.update(words)
+                
+                return list(all_keywords)
+            except Exception as e:
+                logger.warning(f"Error infiriendo keywords relevantes: {e}")
+        
+        # Fallback a la lista hardcodeada original
+        return ['ai', 'machine learning', 'llm', 'llmops', 'mlops', 'python', 'aws', 'gcp']
     
     def _load_profile(self) -> Dict:
         """Carga el perfil del usuario."""
@@ -231,6 +357,57 @@ class MatcherAgent:
             'details': details
         }
     
+    def _calculate_employment_type_score(self, job_text: str, max_score: int) -> int:
+        """Calcula score de tipo de empleo usando términos configurados."""
+        # Verificar full-time
+        for term in self.employment_type_terms['full_time']:
+            if term in job_text:
+                return self.employment_type_scores['full_time']
+        
+        # Verificar otros tipos
+        for emp_type in ['part_time', 'contract', 'freelance']:
+            for term in self.employment_type_terms[emp_type]:
+                if term in job_text:
+                    return self.employment_type_scores[emp_type]
+        
+        # Neutral si no se encuentra nada
+        return self.employment_type_scores['neutral']
+    
+    def _calculate_location_score(self, location: str, job_text: str, max_score: int) -> int:
+        """Calcula score de ubicación usando términos configurados."""
+        # Verificar remote
+        for term in self.location_terms['remote']:
+            if term in location or term in job_text:
+                return self.location_scores['remote']
+        
+        # Verificar occasional travel
+        for term in self.location_terms['occasional_travel']:
+            if term in job_text:
+                return self.location_scores['occasional_travel']
+        
+        # Otros
+        return self.location_scores['other']
+    
+    def _calculate_experience_level_score(self, job_text: str, max_score: int) -> int:
+        """Calcula score de nivel de experiencia usando términos configurados."""
+        # Verificar senior/lead
+        for term in self.experience_level_terms['senior']:
+            if term in job_text:
+                return self.experience_level_scores['senior']
+        
+        # Verificar mid-level
+        for term in self.experience_level_terms['mid']:
+            if term in job_text:
+                return self.experience_level_scores['mid']
+        
+        # Verificar junior
+        for term in self.experience_level_terms['junior']:
+            if term in job_text:
+                return self.experience_level_scores['junior']
+        
+        # Si no se encuentra, dar un score neutro (30% del máximo)
+        return int(max_score * 0.3)
+    
     def calculate_match_score(self, job: Dict) -> float:
         """
         Calcula score de match (0-100) entre un trabajo y el perfil.
@@ -250,7 +427,8 @@ class MatcherAgent:
         job_text = f"{job.get('title', '')} {job.get('description', '')} {job.get('summary', '')}".lower()
         location = job.get('location', '').lower()
         
-        # 1. Match de skills (35 puntos)
+        # 1. Match de skills (usar peso configurado)
+        weight_skills = self.scoring_weights['skills_match']
         user_skills = [s.lower() for s in self._extract_skills_from_profile()]
         
         matched_skills = []
@@ -258,54 +436,42 @@ class MatcherAgent:
             if skill in job_text:
                 matched_skills.append(skill)
         
-        skill_score = min(35, (len(matched_skills) / max(len(user_skills), 1)) * 35)
+        skill_score = min(weight_skills, (len(matched_skills) / max(len(user_skills), 1)) * weight_skills)
         score += skill_score
         factors['skills_match'] = round(skill_score, 1)
         
-        # 2. Tipo de trabajo (15 puntos)
-        if any(term in job_text for term in ['part-time', 'part time', 'parttime', 'contract', 'freelance']):
-            type_score = 15
-        elif 'full-time' in job_text or 'fulltime' in job_text:
-            type_score = 4  # Menos preferido pero aceptable
-        else:
-            type_score = 8  # Neutral
-        
+        # 2. Tipo de trabajo (usar términos y scores configurados)
+        weight_type = self.scoring_weights['employment_type']
+        type_score = self._calculate_employment_type_score(job_text, weight_type)
         score += type_score
         factors['type_match'] = type_score
         
-        # 3. Ubicación (15 puntos)
-        if 'remote' in location or 'anywhere' in location or 'work from home' in location:
-            location_score = 15
-        elif 'occasional travel' in job_text or 'travel occasionally' in job_text:
-            location_score = 12
-        else:
-            location_score = 0
-        
+        # 3. Ubicación (usar términos y scores configurados)
+        weight_location = self.scoring_weights['location']
+        location_score = self._calculate_location_score(location, job_text, weight_location)
         score += location_score
         factors['location_match'] = location_score
         
-        # 4. Nivel de experiencia (10 puntos)
-        if any(term in job_text for term in ['senior', 'lead', 'principal', 'expert']):
-            level_score = 10
-        elif 'mid' in job_text or 'intermediate' in job_text:
-            level_score = 5
-        else:
-            level_score = 3
-        
+        # 4. Nivel de experiencia (usar términos y scores configurados)
+        weight_level = self.scoring_weights['experience_level']
+        level_score = self._calculate_experience_level_score(job_text, weight_level)
         score += level_score
         factors['level_match'] = level_score
         
-        # 5. Keywords relevantes (10 puntos)
-        relevant_keywords = ['ai', 'machine learning', 'llm', 'llmops', 'mlops', 'python', 'aws', 'gcp']
+        # 5. Keywords relevantes (usar keywords configurados/inferidos)
+        weight_keywords = self.scoring_weights['relevant_keywords']
+        relevant_keywords = self.relevant_keywords
         keyword_matches = sum(1 for kw in relevant_keywords if kw in job_text)
-        keyword_score = min(10, (keyword_matches / len(relevant_keywords)) * 10)
+        keyword_score = min(weight_keywords, (keyword_matches / max(len(relevant_keywords), 1)) * weight_keywords)
         
         score += keyword_score
         factors['keywords_match'] = round(keyword_score, 1)
         
-        # 6. Idioma y Región (15 puntos) - NUEVO
+        # 6. Idioma y Región (usar peso configurado)
+        weight_language = self.scoring_weights['language_region']
         language_result = self._calculate_language_score(job_text, location)
-        language_score = language_result['score']
+        # Escalar el score de idioma al peso configurado (actualmente es 0-15)
+        language_score = (language_result['score'] / 15.0) * weight_language
         
         score += language_score
         factors['language_match'] = round(language_score, 1)
@@ -326,6 +492,13 @@ class MatcherAgent:
         
         return min(100, max(0, score))
     
+    def _get_employment_type_priority(self, job: Dict) -> int:
+        """Retorna 0 para full-time, 1 para otros tipos."""
+        job_text = f"{job.get('title', '')} {job.get('description', '')}".lower()
+        if 'full-time' in job_text or 'fulltime' in job_text:
+            return 0
+        return 1
+    
     def match_jobs(self, jobs: List[Dict]) -> List[Dict]:
         """Matchea una lista de trabajos con el perfil."""
         # Recargar perfil si estaba vacío
@@ -341,9 +514,10 @@ class MatcherAgent:
             
             matched_jobs.append(job)
         
-        # Ordenar primero por prioridad de región (1=hispanos, 2=ingleses), luego por score descendente
+        # Ordenar por: región (1=hispanos), tipo de trabajo (full-time primero), score descendente
         matched_jobs.sort(key=lambda x: (
             x.get('region_priority', 999),  # Prioridad de región (menor es mejor, hispanos primero)
+            self._get_employment_type_priority(x),  # Full-time = 0, otros = 1
             -x.get('match_score', 0)  # Score descendente (negativo para orden descendente)
         ))
         

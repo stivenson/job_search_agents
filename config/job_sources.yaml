@@ -13,6 +13,7 @@ keywords:
 
 filters:
   employment_type:
+    - "full-time"
     - "part-time"
     - "contract"
     - "freelance"
@@ -97,6 +98,58 @@ language_preferences:
     - "costa rica"
     - "panama"
     - "panamá"
+
+# Configuración de matching y scoring
+matching:
+  # Pesos del algoritmo de scoring (deben sumar 100)
+  scoring_weights:
+    skills_match: 35
+    employment_type: 15
+    location: 15
+    experience_level: 10
+    relevant_keywords: 10
+    language_region: 15
+  
+  # Términos para detectar tipos de empleo en descripciones
+  employment_type_terms:
+    full_time: ['full-time', 'fulltime', 'full time', 'permanent']
+    part_time: ['part-time', 'part time', 'parttime']
+    contract: ['contract', 'contractor', 'contracting']
+    freelance: ['freelance', 'freelancer', 'freelancing']
+  
+  # Scores por tipo de empleo (dentro del peso de employment_type)
+  employment_type_scores:
+    full_time: 15
+    part_time: 4
+    contract: 4
+    freelance: 4
+    neutral: 8
+  
+  # Términos para detectar ubicación en descripciones
+  location_terms:
+    remote: ['remote', 'anywhere', 'work from home', 'wfh', 'distributed', 'work from anywhere']
+    occasional_travel: ['occasional travel', 'travel occasionally', 'some travel', 'travel required']
+  
+  # Scores por ubicación (dentro del peso de location)
+  location_scores:
+    remote: 15
+    occasional_travel: 12
+    other: 0
+  
+  # Términos para detectar nivel de experiencia en descripciones
+  experience_level_terms:
+    senior: ['senior', 'lead', 'principal', 'expert', 'staff', 'sr.', 'sr']
+    mid: ['mid', 'intermediate', 'mid-level', 'middle']
+    junior: ['junior', 'entry', 'associate', 'jr.', 'jr', 'entry-level']
+  
+  # Scores por nivel de experiencia (dentro del peso de experience_level)
+  experience_level_scores:
+    senior: 10
+    mid: 5
+    junior: 3
+  
+  # Keywords relevantes para matching (si vacío, se infiere de keywords + skills_required)
+  relevant_keywords: []
 
 # Regiones de búsqueda - Priorizar países hispanos, luego angloparlantes
 search_regions:
