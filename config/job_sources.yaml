@@ -11,13 +11,20 @@ keywords:
   - "Senior Python Developer"
   - "Cloud AI Engineer"
 
+# NOTA: Los siguientes filtros están definidos pero NO se usan actualmente en el orquestador.
+# Están preparados para uso futuro cuando se implemente filtrado pre-búsqueda.
+# Actualmente, el sistema usa matching.employment_type_terms y matching.location_terms para scoring.
 filters:
+  # USO FUTURO: Filtro de tipo de empleo para pre-filtrar búsquedas.
+  # El método filter_by_criteria() en linkedin_agent.py puede usar esto, pero no se llama actualmente.
   employment_type:
     - "full-time"
     - "part-time"
     - "contract"
     - "freelance"
     - "temporary"
+  # USO FUTURO: Filtro de ubicación para pre-filtrar búsquedas.
+  # El método filter_by_criteria() en linkedin_agent.py puede usar esto, pero no se llama actualmente.
   location:
     - "remote"
     - "anywhere"
@@ -180,7 +187,9 @@ search_regions:
     - "Ireland"
     - "South Africa"
   
-  # Códigos de país para APIs (si aplica)
+  # USO FUTURO: Códigos de país ISO para APIs oficiales (Indeed, LinkedIn API, etc.)
+  # Preparado para integraciones futuras que requieran códigos ISO en lugar de nombres completos.
+  # Actualmente los agentes usan nombres completos de países (search_regions.hispanic_countries, etc.)
   country_codes:
     colombia: "co"
     mexico: "mx"

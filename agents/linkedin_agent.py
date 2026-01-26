@@ -75,7 +75,16 @@ class LinkedInAgent:
             return []
     
     def filter_by_criteria(self, jobs: List[Dict], criteria: Dict) -> List[Dict]:
-        """Filtra trabajos por criterios específicos."""
+        """
+        Filtra trabajos por criterios específicos.
+        
+        NOTA: Este método está definido pero NO se llama actualmente desde el orquestador.
+        Está preparado para uso futuro cuando se implemente filtrado pre-búsqueda.
+        
+        Puede usar filters.employment_type y filters.location del job_sources.yaml.
+        Actualmente, el sistema usa matching.employment_type_terms y matching.location_terms
+        para scoring post-búsqueda en lugar de filtrado pre-búsqueda.
+        """
         filtered = []
         
         for job in jobs:
