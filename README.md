@@ -355,23 +355,9 @@ The system will execute the following flow:
 
 ### Example Output
 
-```
-============================================================
-Starting LangGraph Job Search System
-============================================================
-Executing search workflow...
+![Job Search Process Completion](image/end_process_preview.png)
 
-============================================================
-RESULTS SUMMARY
-============================================================
-Total jobs found: 45
-Relevant jobs (score >= 60): 23
-Average score: 72.5
-Emails found: 8
-
-✅ HTML report generated successfully!
-📄 File saved at: job_search_agents/results/job_search_results_20250125_143022.html
-```
+*Example of the final output showing the HTML report generation, top 5 recommended jobs, search statistics, and total execution time (approximately 1 hour and 4 minutes in this example).*
 
 ## 📂 Project Structure
 

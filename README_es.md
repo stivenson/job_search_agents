@@ -357,23 +357,9 @@ El sistema ejecutará el siguiente flujo:
 
 ### Ejemplo de Salida
 
-```
-============================================================
-Iniciando Sistema de Búsqueda de Empleo con LangGraph
-============================================================
-Ejecutando workflow de búsqueda...
+![Finalización del Proceso de Búsqueda](image/end_process_preview.png)
 
-============================================================
-RESUMEN DE RESULTADOS
-============================================================
-Total de trabajos encontrados: 45
-Trabajos relevantes (score >= 60): 23
-Score promedio: 72.5
-Emails encontrados: 8
-
-✅ Reporte HTML generado exitosamente!
-📄 Archivo guardado en: job_search_agents/results/job_search_results_20250125_143022.html
-```
+*Ejemplo de la salida final mostrando la generación del reporte HTML, los top 5 trabajos recomendados, estadísticas de búsqueda y tiempo total de ejecución (aproximadamente 1 hora y 4 minutos en este ejemplo).*
 
 ## 📂 Estructura del Proyecto
 
