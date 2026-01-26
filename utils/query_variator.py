@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
+from utils.skill_loader import SkillLoader
 from config.settings import (
     LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY,
     USE_QUERY_VARIATIONS
@@ -34,6 +35,7 @@ class QueryVariator:
         """
         self.enabled = enabled if enabled is not None else USE_QUERY_VARIATIONS
         self.llm = None
+        self.prompt_template = None
         
         if self.enabled:
             if LLM_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
@@ -54,6 +56,14 @@ class QueryVariator:
             
             if not self.llm:
                 logger.warning("QueryVariator habilitado pero sin LLM disponible, usando fallback")
+            else:
+                # Cargar skill para template de prompt
+                try:
+                    skill_loader = SkillLoader()
+                    self.prompt_template = skill_loader.load_skill("query-variator")
+                    logger.debug("Skill query-variator cargado correctamente")
+                except Exception as e:
+                    logger.warning(f"Error cargando skill query-variator: {e}, usando prompts por defecto")
     
     def generate_variations(self, keyword: str, num_variations: int = 3) -> List[str]:
         """
@@ -74,11 +84,16 @@ class QueryVariator:
             return self._simple_variations(keyword, num_variations)
         
         try:
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", """Eres un asistente que genera variaciones naturales de búsquedas de trabajo. 
+            # Usar skill si está disponible, sino usar prompt por defecto
+            if self.prompt_template:
+                prompt = self.prompt_template
+            else:
+                # Fallback: prompt hardcodeado si no se pudo cargar el skill
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", """Eres un asistente que genera variaciones naturales de búsquedas de trabajo. 
 Genera variaciones que un humano usaría al buscar trabajo en un buscador de empleos, 
 no keywords técnicos directos. Las variaciones deben ser frases completas y naturales."""),
-                ("human", """Genera {num} variaciones naturales de búsqueda para: '{keyword}'.
+                    ("human", """Genera {num} variaciones naturales de búsqueda para: '{keyword}'.
 
 Las variaciones deben:
 - Sonar como búsquedas humanas reales
@@ -87,7 +102,7 @@ Las variaciones deben:
 - Variar la forma de expresar el mismo concepto
 
 Responde SOLO con las variaciones, una por línea, sin numeración ni viñetas.""")
-            ])
+                ])
             
             chain = prompt | self.llm
             response = chain.invoke({"keyword": keyword, "num": num_variations})

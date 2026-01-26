@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from tools.email_validator import EmailValidator
+from utils.skill_loader import SkillLoader
 from config.settings import (
     LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY,
     EMAIL_EXTRACTION_CONCURRENCY
@@ -54,28 +55,9 @@ class EmailExtractorAgent:
         # Parser de salida
         self.output_parser = PydanticOutputParser(pydantic_object=ContactInfo)
         
-        # Template de prompt
-        self.prompt_template = ChatPromptTemplate.from_messages([
-            ("system", """Eres un experto en extraer información de contacto de descripciones de trabajos.
-            
-Tu tarea es identificar emails de contacto relevantes para aplicar a un trabajo. Busca:
-- Emails de aplicación directa
-- Emails de reclutadores
-- Emails de recursos humanos
-- Emails de contacto general
-
-Ignora:
-- Emails de no-reply
-- Emails de notificaciones automáticas
-- Emails genéricos de sistemas
-
-Responde solo con emails válidos y relevantes."""),
-            ("human", """Extrae información de contacto de esta descripción de trabajo:
-
-{description}
-
-{format_instructions}""")
-        ])
+        # Cargar skill para template de prompt
+        skill_loader = SkillLoader()
+        self.prompt_template = skill_loader.load_skill("email-extractor")
     
     async def extract_emails(self, job_description: str) -> Dict:
         """Extrae emails de una descripción de trabajo (versión async)."""

@@ -659,9 +659,8 @@ Skills are reusable instruction sets stored in `SKILL.md` files with YAML frontm
 
 The system includes the following skills:
 
-- **`email-extractor`**: Extracts contact emails from job descriptions using intelligent LLM analysis
-- **`job-matcher`**: Documents the job matching algorithm and scoring criteria
-- **`query-variator`**: Generates natural variations of search queries to appear more human-like
+- **`email-extractor`**: Extracts contact emails from job descriptions using intelligent LLM analysis. Used by `EmailExtractorAgent`.
+- **`query-variator`**: Generates natural variations of search queries to appear more human-like. Used by `QueryVariator` utility.
 
 ### Benefits of the Skills System
 

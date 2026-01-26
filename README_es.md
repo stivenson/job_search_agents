@@ -670,9 +670,8 @@ Los skills son conjuntos de instrucciones reutilizables almacenados en archivos 
 
 El sistema incluye los siguientes skills:
 
-- **`email-extractor`**: Extrae emails de contacto de descripciones de trabajo usando análisis inteligente con LLM
-- **`job-matcher`**: Documenta el algoritmo de matching y criterios de scoring
-- **`query-variator`**: Genera variaciones naturales de queries de búsqueda para parecer más humanas
+- **`email-extractor`**: Extrae emails de contacto de descripciones de trabajo usando análisis inteligente con LLM. Usado por `EmailExtractorAgent`.
+- **`query-variator`**: Genera variaciones naturales de queries de búsqueda para parecer más humanas. Usado por la utilidad `QueryVariator`.
 
 ### Ventajas del Sistema de Skills
 
