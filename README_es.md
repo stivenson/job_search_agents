@@ -39,6 +39,29 @@ python main.py
 
 ---
 
+<div align="center">
+
+## ⏱️ **TIEMPO DE EJECUCIÓN** ⏱️
+
+<div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+
+### ⚠️ **IMPORTANTE: Tiempo Estimado del Proceso**
+
+**El proceso completo normalmente puede tardar entre 30 minutos y 1 hora y media**, dependiendo de:
+
+- 💻 **Características de tu máquina** (procesador, RAM, velocidad de disco)
+- 🌐 **Velocidad de tu conexión a internet**
+- 📊 **Cantidad de trabajos encontrados** en cada fuente
+- 🔍 **Número de fuentes habilitadas** en la configuración
+
+**💡 Recomendación**: Deja el sistema ejecutándose y no cierres la terminal. El sistema mostrará el progreso en tiempo real y generará el reporte HTML al finalizar.
+
+</div>
+
+</div>
+
+---
+
 ## 🎯 Características
 
 <div align="center">

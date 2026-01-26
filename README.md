@@ -39,6 +39,29 @@ python main.py
 
 ---
 
+<div align="center">
+
+## ⏱️ **EXECUTION TIME** ⏱️
+
+<div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+
+### ⚠️ **IMPORTANT: Estimated Process Time**
+
+**The complete process normally takes between 30 minutes and 1.5 hours**, depending on:
+
+- 💻 **Your machine specifications** (processor, RAM, disk speed)
+- 🌐 **Your internet connection speed**
+- 📊 **Number of jobs found** in each source
+- 🔍 **Number of enabled sources** in the configuration
+
+**💡 Recommendation**: Let the system run and don't close the terminal. The system will show real-time progress and generate the HTML report when finished.
+
+</div>
+
+</div>
+
+---
+
 ## 🎯 Features
 
 <div align="center">
