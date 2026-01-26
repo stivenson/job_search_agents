@@ -10,10 +10,9 @@
 
 <div align="center">
 
-**Intelligent job search system that uses LangGraph agents to search for remote part-time jobs across multiple sources, extract contact information, and generate an interactive HTML report.**
+**Intelligent job search system that uses LangGraph agents to search for jobs across multiple sources, extract contact information, and generate an interactive HTML report.**
 
 </div>
-
 ---
 
 <div align="center">

@@ -10,7 +10,7 @@
 
 <div align="center">
 
-**Sistema inteligente de búsqueda de empleo que utiliza agentes LangGraph para buscar trabajos de tiempo parcial remotos en múltiples fuentes, extraer información de contacto y generar un reporte HTML interactivo.**
+**Sistema inteligente de búsqueda de empleo que utiliza agentes LangGraph para buscar trabajos en múltiples fuentes, extraer información de contacto y generar un reporte HTML interactivo.**
 
 </div>
 
