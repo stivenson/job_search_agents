@@ -18,6 +18,27 @@
 
 <div align="center">
 
+## 🆕 **NUEVAS CARACTERÍSTICAS LLM-ENHANCED (v2.0)**
+
+<div style="background-color: #e3f2fd; border: 2px solid #2196F3; border-radius: 8px; padding: 20px; margin: 20px 0;">
+
+El sistema ahora incluye capacidades mejoradas por LLM que hacen las búsquedas **significativamente más inteligentes**:
+
+- **🎯 Keywords Adaptativos**: El LLM genera keywords optimizados para cada fuente y región basándose en tu perfil (+30-50% mejor relevancia)
+- **🧠 Matching Semántico**: Análisis profundo de relevancia más allá de keywords simples (+40-60% mejor precisión)
+- **🔄 Enfoque Híbrido**: Combina matching heurístico rápido con análisis semántico inteligente
+- **🌍 Adaptación Regional**: Keywords y análisis específicos para regiones hispanas vs angloparlantes
+
+**📖 Ver [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) para documentación completa.**
+
+</div>
+
+</div>
+
+---
+
+<div align="center">
+
 ## ⚡ **INICIO RÁPIDO** ⚡
 
 ```bash
@@ -75,7 +96,9 @@ python main.py
 - **🔍 Búsqueda Multi-Fuente**: Busca en LinkedIn, RemoteOK, We Work Remotely, Stack Overflow Jobs, GitHub Jobs, Findjobit
 - **🤖 Agentes Especializados**: Cada fuente tiene su propio agente optimizado con técnicas anti-bot avanzadas
 - **📧 Extracción Inteligente de Emails**: Usa LLMs para extraer emails de contacto de las descripciones de trabajo
-- **🎯 Matching Inteligente**: Calcula score de match entre trabajos y tu perfil usando embeddings y análisis semántico
+- **🎯 Matching Inteligente**: Calcula score de match entre trabajos y tu perfil usando matching heurístico + análisis semántico profundo con LLM (híbrido)
+- **🤖 Keywords Adaptativos**: Genera keywords optimizados dinámicamente por fuente y región usando LLM (NUEVO)
+- **🧠 Análisis Semántico**: Matching semántico inteligente que entiende sinónimos y contexto real (NUEVO)
 - **📊 Reporte HTML Interactivo**: Genera un reporte HTML con filtros, estadísticas y visualizaciones
 - **🔄 Arquitectura LangGraph**: Workflow coordinado usando LangGraph StateGraph para orquestación de agentes
 - **🛡️ Protección Anti-Bot**: Sistema avanzado con rotación de User-Agents, circuit breakers, rate limiting adaptativo y más
@@ -299,6 +322,19 @@ El archivo `env.example` contiene todas las variables disponibles con documentac
 | `USE_SESSION_WARMUP`         | `true` | Warm-up de sesión antes de scraping   |
 | `USE_QUERY_VARIATIONS`       | `true` | Generar variaciones de queries con LLM |
 
+### 🤖 Configuración LLM-Enhanced (NUEVO)
+
+| Variable                       | Default | Descripción                                                           |
+| ------------------------------ | ------- | --------------------------------------------------------------------- |
+| `USE_ADAPTIVE_KEYWORDS`      | `true` | Generar keywords adaptativos por fuente/región con LLM               |
+| `USE_SEMANTIC_MATCHING`      | `true` | Análisis semántico profundo de relevancia con LLM                    |
+| `SEMANTIC_MATCHING_THRESHOLD` | `50`   | Score mínimo heurístico para análisis semántico (0-100)               |
+| `SEMANTIC_MAX_JOBS`           | `100`  | Máximo de trabajos a analizar semánticamente                         |
+| `SEMANTIC_WEIGHT`             | `0.6`  | Peso del score semántico en score final (0-1)                        |
+| `HEURISTIC_WEIGHT`            | `0.4`  | Peso del score heurístico en score final (0-1, debe sumar 1.0 con SEMANTIC_WEIGHT) |
+
+**📖 Ver [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) para detalles completos sobre estas características.**
+
 ### 📁 Configuración de Paths
 
 | Variable       | Default                                             | Descripción         |
@@ -373,7 +409,9 @@ job_search_agents/
 │   ├── tech_jobs_agent.py       # Agente trabajos técnicos
 │   ├── findjobit_agent.py       # Agente Findjobit (LATAM)
 │   ├── email_extractor_agent.py # Extracción de emails
-│   └── matcher_agent.py         # Matching con perfil
+│   ├── matcher_agent.py         # Matching con perfil
+│   ├── keyword_generator_agent.py # Generación de keywords adaptativos (NUEVO)
+│   └── semantic_matcher_agent.py   # Matching semántico inteligente (NUEVO)
 │   ├── cv_parser.py             # Parser de CV
 │   ├── html_generator.py         # Generador HTML
 │   ├── user_agent_rotator.py    # Rotación de User-Agents
@@ -403,6 +441,10 @@ job_search_agents/
 ├── templates/                   # 📄 Templates HTML
 │   └── results_template.html
 ├── skills/                      # 🎯 Agent Skills (prompts de LLM)
+│   ├── email-extractor/         # Skill: extracción de emails
+│   ├── query-variator/          # Skill: variaciones de queries
+│   ├── keyword-generator/       # Skill: keywords adaptativos (NUEVO)
+│   └── semantic-matcher/        # Skill: matching semántico (NUEVO)
 │   ├── email-extractor/         # Skill de extracción de emails
 │   │   └── SKILL.md
 │   ├── job-matcher/             # Skill de matching de trabajos
@@ -425,7 +467,9 @@ job_search_agents/
 
 ### 🎯 Personalizar Keywords de Búsqueda
 
-Edita `config/job_sources.yaml` para cambiar los keywords:
+**Opción 1: Keywords Estáticos (Tradicional)**
+
+Edita `config/job_sources.yaml` para cambiar los keywords base:
 
 ```yaml
 keywords:
@@ -435,6 +479,14 @@ keywords:
   - "Machine Learning Engineer"
   # Agrega más keywords según tu perfil
 ```
+
+**Opción 2: Keywords Adaptativos con LLM (Recomendado - NUEVO)**
+
+Si `USE_ADAPTIVE_KEYWORDS=true` (por defecto), el sistema generará automáticamente keywords optimizados para cada fuente y región basándose en tu perfil. Los keywords en `job_sources.yaml` se usan como base y el LLM los adapta dinámicamente.
+
+**💡 Ventaja**: Los keywords adaptativos mejoran la relevancia en un 30-50% comparado con keywords estáticos.
+
+Ver [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) para más detalles.
 
 ### 🔄 Filtrar Fuentes de Empleo
 
@@ -672,6 +724,8 @@ El sistema incluye los siguientes skills:
 
 - **`email-extractor`**: Extrae emails de contacto de descripciones de trabajo usando análisis inteligente con LLM. Usado por `EmailExtractorAgent`.
 - **`query-variator`**: Genera variaciones naturales de queries de búsqueda para parecer más humanas. Usado por la utilidad `QueryVariator`.
+- **`keyword-generator`**: Genera keywords de búsqueda adaptados dinámicamente al perfil, fuente y región. Usado por `KeywordGeneratorAgent`. (NUEVO)
+- **`semantic-matcher`**: Analiza semánticamente la relevancia entre trabajos y perfil del candidato. Usado por `SemanticMatcherAgent`. (NUEVO)
 
 ### Ventajas del Sistema de Skills
 

@@ -89,6 +89,14 @@ USE_FINGERPRINT_CONSISTENCY: bool = os.getenv("USE_FINGERPRINT_CONSISTENCY", "tr
 USE_SESSION_WARMUP: bool = os.getenv("USE_SESSION_WARMUP", "true").lower() == "true"  # Warm-up de sesión antes de scraping
 USE_QUERY_VARIATIONS: bool = os.getenv("USE_QUERY_VARIATIONS", "true").lower() == "true"  # Generar variaciones de queries con LLM
 
+# LLM-Enhanced Search Features
+USE_ADAPTIVE_KEYWORDS: bool = os.getenv("USE_ADAPTIVE_KEYWORDS", "true").lower() == "true"  # Generar keywords adaptativos por fuente/región con LLM
+USE_SEMANTIC_MATCHING: bool = os.getenv("USE_SEMANTIC_MATCHING", "true").lower() == "true"  # Análisis semántico profundo de relevancia
+SEMANTIC_MATCHING_THRESHOLD: int = int(os.getenv("SEMANTIC_MATCHING_THRESHOLD", "50"))  # Score mínimo para análisis semántico
+SEMANTIC_MAX_JOBS: int = int(os.getenv("SEMANTIC_MAX_JOBS", "100"))  # Máximo de trabajos a analizar semánticamente
+SEMANTIC_WEIGHT: float = float(os.getenv("SEMANTIC_WEIGHT", "0.6"))  # Peso del score semántico en score final (0-1)
+HEURISTIC_WEIGHT: float = float(os.getenv("HEURISTIC_WEIGHT", "0.4"))  # Peso del score heurístico en score final (0-1)
+
 # User Profile (REQUIRED - no default values for privacy)
 USER_EMAIL: Optional[str] = os.getenv("USER_EMAIL")
 USER_PHONE: Optional[str] = os.getenv("USER_PHONE")
@@ -142,6 +150,25 @@ if FAST_MODE:
     MIN_DELAY = 0.3  # Reduced from 1.5s
     MAX_DELAY = 1.0  # Reduced from 4.0s
     SIMULATE_HUMAN_BEHAVIOR = False  # Disable by default in fast mode
+
+# Validate LLM-Enhanced Search weights
+if not (0 <= SEMANTIC_WEIGHT <= 1):
+    raise ValueError(
+        f"SEMANTIC_WEIGHT ({SEMANTIC_WEIGHT}) must be between 0 and 1. "
+        "Check your .env file or environment variables."
+    )
+
+if not (0 <= HEURISTIC_WEIGHT <= 1):
+    raise ValueError(
+        f"HEURISTIC_WEIGHT ({HEURISTIC_WEIGHT}) must be between 0 and 1. "
+        "Check your .env file or environment variables."
+    )
+
+if abs((SEMANTIC_WEIGHT + HEURISTIC_WEIGHT) - 1.0) > 0.001:
+    raise ValueError(
+        f"SEMANTIC_WEIGHT ({SEMANTIC_WEIGHT}) and HEURISTIC_WEIGHT ({HEURISTIC_WEIGHT}) "
+        "must sum to 1.0. Check your .env file or environment variables."
+    )
 
 # Validate configuration ranges
 if MIN_DELAY >= MAX_DELAY:
