@@ -27,8 +27,6 @@ The system now includes LLM-enhanced capabilities that make searches **significa
 - **🔄 Hybrid Approach**: Combines fast heuristic matching with intelligent semantic analysis
 - **🌍 Regional Adaptation**: Keywords and analysis specific to Hispanic vs English-speaking regions
 
-**📖 See [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) for complete documentation.**
-
 </div>
 
 ---
@@ -319,8 +317,6 @@ The `env.example` file contains all available variables with complete documentat
 | `SEMANTIC_WEIGHT` | `0.6` | Weight of semantic score in final score (0-1) |
 | `HEURISTIC_WEIGHT` | `0.4` | Weight of heuristic score in final score (0-1, must sum 1.0 with SEMANTIC_WEIGHT) |
 
-**📖 See [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) for complete details on these features.**
-
 ### 📁 Path Configuration
 
 | Variable | Default | Description |
@@ -469,8 +465,6 @@ keywords:
 If `USE_ADAPTIVE_KEYWORDS=true` (default), the system will automatically generate optimized keywords for each source and region based on your profile. Keywords in `job_sources.yaml` are used as a base and the LLM adapts them dynamically.
 
 **💡 Advantage**: Adaptive keywords improve relevance by 30-50% compared to static keywords.
-
-See [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) for more details.
 
 ### 🔄 Filter Job Sources
 
@@ -803,8 +797,6 @@ Each skill directory should contain:
 - **Test prompts**: Validate skills before deploying
 - **Keep skills focused**: One skill should handle one specific task
 - **Use descriptive names**: Skill names should clearly indicate their purpose
-
-For more details, see the [skills/README.md](skills/README.md) file.
 
 ## 🎨 Customization
 

@@ -27,8 +27,6 @@ El sistema ahora incluye capacidades mejoradas por LLM que hacen las búsquedas 
 - **🔄 Enfoque Híbrido**: Combina matching heurístico rápido con análisis semántico inteligente
 - **🌍 Adaptación Regional**: Keywords y análisis específicos para regiones hispanas vs angloparlantes
 
-**📖 Ver [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) para documentación completa.**
-
 </div>
 
 ---
@@ -321,8 +319,6 @@ El archivo `env.example` contiene todas las variables disponibles con documentac
 | `SEMANTIC_WEIGHT`             | `0.6`  | Peso del score semántico en score final (0-1)                        |
 | `HEURISTIC_WEIGHT`            | `0.4`  | Peso del score heurístico en score final (0-1, debe sumar 1.0 con SEMANTIC_WEIGHT) |
 
-**📖 Ver [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) para detalles completos sobre estas características.**
-
 ### 📁 Configuración de Paths
 
 | Variable       | Default                                             | Descripción         |
@@ -473,8 +469,6 @@ keywords:
 Si `USE_ADAPTIVE_KEYWORDS=true` (por defecto), el sistema generará automáticamente keywords optimizados para cada fuente y región basándose en tu perfil. Los keywords en `job_sources.yaml` se usan como base y el LLM los adapta dinámicamente.
 
 **💡 Ventaja**: Los keywords adaptativos mejoran la relevancia en un 30-50% comparado con keywords estáticos.
-
-Ver [LLM_ENHANCED_FEATURES.md](LLM_ENHANCED_FEATURES.md) para más detalles.
 
 ### 🔄 Filtrar Fuentes de Empleo
 
@@ -815,8 +809,6 @@ Cada directorio de skill debe contener:
 - **Prueba los prompts**: Valida skills antes de desplegar
 - **Mantén skills enfocados**: Un skill debe manejar una tarea específica
 - **Usa nombres descriptivos**: Los nombres de skills deben indicar claramente su propósito
-
-Para más detalles, consulta el archivo [skills/README.md](skills/README.md).
 
 ## 🎨 Personalización
 
