@@ -16,8 +16,6 @@
 
 ---
 
-<div align="center">
-
 ## 🆕 **NEW LLM-ENHANCED FEATURES (v2.0)**
 
 <div style="background-color: #e3f2fd; border: 2px solid #2196F3; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -33,11 +31,7 @@ The system now includes LLM-enhanced capabilities that make searches **significa
 
 </div>
 
-</div>
-
 ---
-
-<div align="center">
 
 ## ⚡ **QUICK START** ⚡
 
@@ -56,11 +50,7 @@ python main.py
 
 **✨ Ready! The system will start searching for jobs automatically**
 
-</div>
-
 ---
-
-<div align="center">
 
 ## ⏱️ **EXECUTION TIME** ⏱️
 
@@ -76,8 +66,6 @@ python main.py
 - 🔍 **Number of enabled sources** in the configuration
 
 **💡 Recommendation**: Let the system run and don't close the terminal. The system will show real-time progress and generate the HTML report when finished.
-
-</div>
 
 </div>
 

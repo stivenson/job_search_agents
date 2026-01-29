@@ -16,8 +16,6 @@
 
 ---
 
-<div align="center">
-
 ## 🆕 **NUEVAS CARACTERÍSTICAS LLM-ENHANCED (v2.0)**
 
 <div style="background-color: #e3f2fd; border: 2px solid #2196F3; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -33,11 +31,7 @@ El sistema ahora incluye capacidades mejoradas por LLM que hacen las búsquedas 
 
 </div>
 
-</div>
-
 ---
-
-<div align="center">
 
 ## ⚡ **INICIO RÁPIDO** ⚡
 
@@ -56,11 +50,7 @@ python main.py
 
 **✨ ¡Listo! El sistema comenzará a buscar trabajos automáticamente**
 
-</div>
-
 ---
-
-<div align="center">
 
 ## ⏱️ **TIEMPO DE EJECUCIÓN** ⏱️
 
@@ -76,8 +66,6 @@ python main.py
 - 🔍 **Número de fuentes habilitadas** en la configuración
 
 **💡 Recomendación**: Deja el sistema ejecutándose y no cierres la terminal. El sistema mostrará el progreso en tiempo real y generará el reporte HTML al finalizar.
-
-</div>
 
 </div>
 
