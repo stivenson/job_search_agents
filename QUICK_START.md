@@ -28,7 +28,7 @@ python main.py
 ```
 
 ### 4. Ver resultados
-El sistema generará un archivo HTML en `job_search_agents/results/` con todos los trabajos encontrados.
+El sistema generará un archivo HTML en `results/` (relativo a la raíz del proyecto) con los trabajos encontrados. Puedes cambiar la ruta con `OUTPUT_DIR` en `.env`.
 
 ## Estructura de archivos importantes
 

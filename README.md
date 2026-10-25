@@ -22,8 +22,8 @@
 
 The system now includes LLM-enhanced capabilities that make searches **significantly smarter**:
 
-- **🎯 Adaptive Keywords**: LLM generates optimized keywords for each source and region based on your profile (+30-50% better relevance)
-- **🧠 Semantic Matching**: Deep relevance analysis beyond simple keywords (+40-60% better precision)
+- **🎯 Adaptive Keywords**: LLM generates optimized keywords for each source and region based on your profile
+- **🧠 Semantic Matching**: Deep relevance analysis beyond simple keywords
 - **🔄 Hybrid Approach**: Combines fast heuristic matching with intelligent semantic analysis
 - **🌍 Regional Adaptation**: Keywords and analysis specific to Hispanic vs English-speaking regions
 
@@ -52,22 +52,7 @@ python main.py
 
 ---
 
-## ⏱️ **EXECUTION TIME** ⏱️
-
-<div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
-
-### ⚠️ **IMPORTANT: Estimated Process Time**
-
-**The complete process normally takes between 30 minutes and 1.5 hours**, depending on:
-
-- 💻 **Your machine specifications** (processor, RAM, disk speed)
-- 🌐 **Your internet connection speed**
-- 📊 **Number of jobs found** in each source
-- 🔍 **Number of enabled sources** in the configuration
-
-**💡 Recommendation**: Let the system run and don't close the terminal. The system will show real-time progress and generate the HTML report when finished.
-
-</div>
+Search duration varies with enabled sources, network conditions, result volume, and LLM provider. Follow the terminal progress; the HTML report is written when the workflow finishes.
 
 ---
 
@@ -77,12 +62,13 @@ python main.py
 
 ### 🔍 Supported Job Sources
 
-![LinkedIn](https://img.shields.io/badge/LinkedIn-Supported-0077B5?style=flat-square&logo=linkedin&logoColor=white) ![Computrabajo](https://img.shields.io/badge/Computrabajo-Supported-FF6B00?style=flat-square) ![RemoteOK](https://img.shields.io/badge/RemoteOK-Supported-00C853?style=flat-square) ![Stack Overflow](https://img.shields.io/badge/Stack%20Overflow-Supported-F58025?style=flat-square&logo=stackoverflow&logoColor=white) ![GitHub Jobs](https://img.shields.io/badge/GitHub%20Jobs-Supported-181717?style=flat-square&logo=github&logoColor=white) ![Findjobit](https://img.shields.io/badge/Findjobit-Supported-FF6B6B?style=flat-square)
+![LinkedIn](https://img.shields.io/badge/LinkedIn-Supported-0077B5?style=flat-square&logo=linkedin&logoColor=white) ![Computrabajo](https://img.shields.io/badge/Computrabajo-Supported-FF6B00?style=flat-square) ![RemoteOK](https://img.shields.io/badge/RemoteOK-Supported-00C853?style=flat-square) ![Stack Overflow](https://img.shields.io/badge/Stack%20Overflow-Supported-F58025?style=flat-square&logo=stackoverflow&logoColor=white) ![Findjobit](https://img.shields.io/badge/Findjobit-Supported-FF6B6B?style=flat-square)
 
 </div>
 
 - **🔍 Multi-Source Search**: Supports LinkedIn and Computrabajo for local Colombia searches, plus configurable remote/global sources
-- **🤖 Specialized Agents**: Each source has its own optimized agent with advanced anti-bot techniques
+- **🤖 Specialized Agents**: Each source has its own agent and source-specific request handling
+- **🇨🇴 Computrabajo**: Colombia-focused source, disabled by default; enable it in `config/local_search.yaml`. The collector stops when it encounters access-denied, rate-limit, or challenge responses.
 - **📧 Intelligent Email Extraction**: Uses LLMs to extract contact emails from job descriptions
 - **🎯 Intelligent Matching**: Calculates match score between jobs and your profile using heuristic matching + deep semantic analysis with LLM (hybrid)
 - **🤖 Adaptive Keywords**: Dynamically generates optimized keywords by source and region using LLM (NEW)
@@ -183,20 +169,17 @@ Edit `data/profile.json` with your personal and professional information.
 
 ### 📝 Required Environment Variables
 
-The system requires the following variables to function:
+Required values are `USER_EMAIL`, `USER_PHONE`, and the credential for the selected LLM provider. Hugging Face endpoint, model, route, and timeout values have defaults and can be overridden when needed.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `USER_EMAIL` | Your contact email | `your_email@example.com` |
 | `USER_PHONE` | Your phone (with country code) | `+1234567890` |
 | `HF_TOKEN` | Hugging Face token (if `LLM_PROVIDER=huggingface`) | `hf_...` |
-| `HF_API_BASE_URL` | Hugging Face OpenAI-compatible endpoint | `https://router.huggingface.co/v1` |
-| `HF_PLANNER_MODEL` | Model for keyword/query planning | `moonshotai/Kimi-K3` |
-| `HF_EXTRACTOR_MODEL` | Model for extraction and semantic matching | `Qwen/Qwen3.6-27B` |
-| `HF_MODEL_ROUTE` | Inference Router route | `fastest` |
-| `HF_TIMEOUT_SECONDS` | Request timeout | `90` |
+| `OPENAI_API_KEY` | OpenAI key (if `LLM_PROVIDER=openai`) | `sk-...` |
+| `ANTHROPIC_API_KEY` | Anthropic key (if `LLM_PROVIDER=anthropic`) | `sk-ant-...` |
 
-**⚠️ Important**: The system will validate these variables at startup and fail with a clear message if they are missing.
+Provider-specific credentials are conditional: configure only the key for your selected `LLM_PROVIDER`. Hugging Face options such as `HF_API_BASE_URL`, `HF_PLANNER_MODEL`, `HF_EXTRACTOR_MODEL`, `HF_MODEL_ROUTE`, and `HF_TIMEOUT_SECONDS` are optional overrides with defaults.
 
 ### 🔑 API Key Configuration
 
@@ -334,8 +317,8 @@ The `env.example` file contains all available variables with complete documentat
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CV_PATH` | `cv/resume.md` | Path to resume file |
-| `OUTPUT_DIR` | `job_search_agents/results` | Output directory |
-| `DATA_DIR` | `job_search_agents/data` | Data directory |
+| `OUTPUT_DIR` | `results` | Output directory, relative to the project root |
+| `DATA_DIR` | `data` | Data directory, relative to the project root |
 
 ### 📝 Logging Configuration
 
@@ -480,7 +463,7 @@ keywords:
 
 If `USE_ADAPTIVE_KEYWORDS=true` (default), the system will automatically generate optimized keywords for each source and region based on your profile. Keywords from the merged configuration are used as a base and the LLM adapts them dynamically.
 
-**💡 Advantage**: Adaptive keywords improve relevance by 30-50% compared to static keywords.
+Adaptive keywords let the LLM tailor search terms to the profile, source, and region. Results depend on the selected model and configuration.
 
 ### 🔄 Filter Job Sources
 
@@ -589,6 +572,7 @@ File generated at `results/job_search_results_YYYYMMDD_HHMMSS.html` with:
 **Solution**:
 - If `LLM_PROVIDER=huggingface`, configure `HF_TOKEN` and the `HF_*` variables
 - If `LLM_PROVIDER=openai`, configure `OPENAI_API_KEY`
+- If `LLM_PROVIDER=anthropic`, configure `ANTHROPIC_API_KEY`
 - Verify that the variable is in your `.env` file
 
 ### ❌ Error: "No module named 'langgraph'"
