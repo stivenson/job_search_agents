@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from tools.web_scraper import SimpleHTTPScraper
+from config.settings import MAX_JOBS_PER_SOURCE
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +20,11 @@ class FindjobitAgent:
     def __init__(self):
         self.scraper = SimpleHTTPScraper()
         self.base_url = "https://findjobit.com"
+        self.max_results = MAX_JOBS_PER_SOURCE
 
     async def search(self, keywords: List[str], region_type: Optional[str] = None) -> List[Dict]:
         """
-        Busca trabajos en Findjobit con soporte para filtros regionales.
+        Busca trabajos en Findjobit con soporte para filtros regionales y paginación.
 
         Findjobit es un portal enfocado en LATAM con trabajos técnicos.
         Soporta búsqueda por keywords y tiene filtros por país LATAM.
@@ -33,39 +35,45 @@ class FindjobitAgent:
             logger.info(f"Buscando trabajos en Findjobit con keywords: {keywords}")
 
         all_jobs = []
+        page = 1
 
-        # Findjobit no tiene API, necesitamos scraping web
-        # La página principal muestra trabajos por categoría
-        try:
-            html = await asyncio.get_event_loop().run_in_executor(None, self.scraper.fetch, self.base_url)
-            soup = self.scraper.parse_html(html)
+        while len(all_jobs) < self.max_results:
+            try:
+                # Usar parámetro ?page=N para paginación
+                url = self.base_url if page == 1 else f"{self.base_url}?page={page}"
+                html = await asyncio.get_event_loop().run_in_executor(None, self.scraper.fetch, url)
+                soup = self.scraper.parse_html(html)
 
-            # Buscar trabajos en la página principal
-            jobs_found = self._extract_jobs_from_page(soup, keywords)
-            all_jobs.extend(jobs_found)
+                jobs_on_page = self._extract_jobs_from_page(soup, keywords)
 
-            # También buscar en páginas de categorías específicas si los keywords lo sugieren
-            category_jobs = await self._search_by_categories(keywords)
-            all_jobs.extend(category_jobs)
+                if not jobs_on_page:
+                    break  # Sin más resultados
 
-            # Filtrar duplicados por URL
-            unique_jobs = self._remove_duplicates(all_jobs)
+                all_jobs.extend(jobs_on_page)
+                page += 1
 
-            # Marcar metadata de región
-            for job in unique_jobs:
-                job['search_keywords'] = keywords
-                if not job.get('location'):
-                    job['location'] = 'Remote/LATAM'
-                if region_type:
-                    job['search_region'] = region_type
-                    job['region_priority'] = 1 if region_type == "hispanic" else 2
+                # Findjobit limita a pocas páginas; parar en página 5 para evitar loops
+                if page > 5:
+                    break
 
-            logger.info(f"Encontrados {len(unique_jobs)} trabajos en Findjobit")
-            return unique_jobs
+            except Exception as e:
+                logger.error(f"Error buscando en Findjobit (página {page}): {e}")
+                break
 
-        except Exception as e:
-            logger.error(f"Error buscando en Findjobit: {e}")
-            return []
+        # Filtrar duplicados y recortar al límite
+        unique_jobs = self._remove_duplicates(all_jobs)[:self.max_results]
+
+        # Marcar metadata de región
+        for job in unique_jobs:
+            job['search_keywords'] = keywords
+            if not job.get('location'):
+                job['location'] = 'Remote/LATAM'
+            if region_type:
+                job['search_region'] = region_type
+                job['region_priority'] = 1 if region_type == "hispanic" else 2
+
+        logger.info(f"Encontrados {len(unique_jobs)} trabajos en Findjobit")
+        return unique_jobs
 
     def _extract_jobs_from_page(self, soup: BeautifulSoup, keywords: List[str]) -> List[Dict]:
         """Extrae trabajos de una página HTML de Findjobit.
@@ -105,7 +113,7 @@ class FindjobitAgent:
                                                            for kw in ['ingeniero', 'developer', 'engineer', 'desarrollador', 'backend', 'frontend', 'fullstack', 'ai', 'python', 'llm', 'ml'])]
 
             # Convertir enlaces en objetos de trabajo básicos
-            for link in job_links[:20]:  # Limitar a 20 trabajos
+            for link in job_links[:self.max_results]:
                 title = link.get_text().strip()
                 url = link.get('href')
                 if url and not url.startswith('http'):
@@ -124,7 +132,7 @@ class FindjobitAgent:
                     jobs.append(job)
 
         # Procesar elementos de trabajo encontrados con selectores
-        for element in job_elements[:50]:  # Limitar a 50 trabajos por página
+        for element in job_elements[:self.max_results]:
             try:
                 # Extraer información del trabajo
                 title_elem = element.select_one('h3, .title, .job-title, .position')

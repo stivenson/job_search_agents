@@ -75,11 +75,11 @@ python main.py
 
 ### 🔍 Fuentes de Empleo Soportadas
 
-![LinkedIn](https://img.shields.io/badge/LinkedIn-Soportado-0077B5?style=flat-square&logo=linkedin&logoColor=white) ![RemoteOK](https://img.shields.io/badge/RemoteOK-Soportado-00C853?style=flat-square) ![Stack Overflow](https://img.shields.io/badge/Stack%20Overflow-Soportado-F58025?style=flat-square&logo=stackoverflow&logoColor=white) ![GitHub Jobs](https://img.shields.io/badge/GitHub%20Jobs-Soportado-181717?style=flat-square&logo=github&logoColor=white) ![Findjobit](https://img.shields.io/badge/Findjobit-Soportado-FF6B6B?style=flat-square)
+![LinkedIn](https://img.shields.io/badge/LinkedIn-Soportado-0077B5?style=flat-square&logo=linkedin&logoColor=white) ![Computrabajo](https://img.shields.io/badge/Computrabajo-Soportado-FF6B00?style=flat-square) ![RemoteOK](https://img.shields.io/badge/RemoteOK-Soportado-00C853?style=flat-square) ![Stack Overflow](https://img.shields.io/badge/Stack%20Overflow-Soportado-F58025?style=flat-square&logo=stackoverflow&logoColor=white) ![GitHub Jobs](https://img.shields.io/badge/GitHub%20Jobs-Soportado-181717?style=flat-square&logo=github&logoColor=white) ![Findjobit](https://img.shields.io/badge/Findjobit-Soportado-FF6B6B?style=flat-square)
 
 </div>
 
-- **🔍 Búsqueda Multi-Fuente**: Busca en LinkedIn, RemoteOK, We Work Remotely, Stack Overflow Jobs, GitHub Jobs, Findjobit
+- **🔍 Búsqueda Multi-Fuente**: Soporta LinkedIn y Computrabajo para búsquedas locales en Colombia, además de fuentes remotas/globales configurables
 - **🤖 Agentes Especializados**: Cada fuente tiene su propio agente optimizado con técnicas anti-bot avanzadas
 - **📧 Extracción Inteligente de Emails**: Usa LLMs para extraer emails de contacto de las descripciones de trabajo
 - **🎯 Matching Inteligente**: Calcula score de match entre trabajos y tu perfil usando matching heurístico + análisis semántico profundo con LLM (híbrido)
@@ -187,22 +187,30 @@ El sistema requiere las siguientes variables para funcionar:
 | --------------------- | ---------------------------------------------------- | ------------------------ |
 | `USER_EMAIL`        | Tu email de contacto                                 | `tu_email@example.com` |
 | `USER_PHONE`        | Tu teléfono (con código de país)                  | `+1234567890`          |
-| `ANTHROPIC_API_KEY` | API key de Anthropic (si `LLM_PROVIDER=anthropic`) | `sk-ant-api03-...`     |
-| `OPENAI_API_KEY`    | API key de OpenAI (si `LLM_PROVIDER=openai`)       | `sk-...`               |
+| `HF_TOKEN` | Token de Hugging Face (si `LLM_PROVIDER=huggingface`) | `hf_...` |
+| `HF_API_BASE_URL` | Endpoint compatible con OpenAI de Hugging Face | `https://router.huggingface.co/v1` |
+| `HF_PLANNER_MODEL` | Modelo para keywords y variaciones de consultas | `moonshotai/Kimi-K3` |
+| `HF_EXTRACTOR_MODEL` | Modelo para extracción y análisis semántico | `Qwen/Qwen3.6-27B` |
+| `HF_MODEL_ROUTE` | Ruta de inferencia del Router | `fastest` |
+| `HF_TIMEOUT_SECONDS` | Tiempo máximo de espera | `90` |
 
 **⚠️ Importante**: El sistema validará estas variables al inicio y fallará con un mensaje claro si faltan.
 
 ### 🔑 Configuración de API Keys
 
-#### Para usar Anthropic (Claude):
+#### Para usar Hugging Face Inference:
 
 ```env
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=tu_api_key_aqui
-LLM_MODEL=claude-3-5-sonnet-20241022
+LLM_PROVIDER=huggingface
+HF_TOKEN=tu_token_de_huggingface
+HF_API_BASE_URL=https://router.huggingface.co/v1
+HF_PLANNER_MODEL=moonshotai/Kimi-K3
+HF_EXTRACTOR_MODEL=Qwen/Qwen3.6-27B
+HF_MODEL_ROUTE=fastest
+HF_TIMEOUT_SECONDS=90
 ```
 
-Obtén tu API key en: https://console.anthropic.com/
+Configura `HF_TOKEN` con un token de Hugging Face que tenga acceso al Inference Router.
 
 #### Para usar OpenAI:
 
@@ -221,13 +229,13 @@ El sistema busca tu CV en la ruta configurada. Puedes especificarla de dos forma
 #### Opción 1: Ruta absoluta (recomendado para Windows)
 
 ```env
-CV_PATH=C:\Users\TuUsuario\Mi hoja de vida\CVs_Principales\CV_Dev_Senior_AI_Improvement.md
+CV_PATH=C:\Users\TuUsuario\Documents\cv\resume.md
 ```
 
 #### Opción 2: Ruta relativa (portable)
 
 ```env
-CV_PATH=../CVs_Principales/CV_Dev_Senior_AI_Improvement.md
+CV_PATH=../cv/resume.md
 ```
 
 #### Opción 3: Valor por defecto
@@ -235,10 +243,12 @@ CV_PATH=../CVs_Principales/CV_Dev_Senior_AI_Improvement.md
 Si no especificas `CV_PATH`, el sistema usará:
 
 ```
-CVs_Principales/CV_Dev_Senior_AI_Improvement.md
+cv/resume.md
 ```
 
-(relativo al directorio base del proyecto)
+`cv/resume.md`, dentro del proyecto. La carpeta `cv/` está excluida de Git para
+evitar publicar CVs personales. Las rutas relativas en `CV_PATH`, `OUTPUT_DIR`
+y `DATA_DIR` se resuelven desde la raíz del proyecto.
 
 ## 📚 Variables de Entorno Completas
 
@@ -248,9 +258,9 @@ El archivo `env.example` contiene todas las variables disponibles con documentac
 
 | Variable              | Requerida                     | Descripción               |
 | --------------------- | ----------------------------- | -------------------------- |
-| `ANTHROPIC_API_KEY` | Si `LLM_PROVIDER=anthropic` | API key de Anthropic       |
+| `HF_TOKEN` | Si `LLM_PROVIDER=huggingface` | Token de Hugging Face |
 | `OPENAI_API_KEY`    | Si `LLM_PROVIDER=openai`    | API key de OpenAI          |
-| `LLM_PROVIDER`      | No (default:`openai`)       | `openai` o `anthropic` |
+| `LLM_PROVIDER`      | Sí | `huggingface`, `openai` o `anthropic` |
 | `LLM_MODEL`         | No (default:`gpt-4o-mini`)  | Modelo a utilizar          |
 
 ### 👤 Perfil de Usuario
@@ -323,7 +333,7 @@ El archivo `env.example` contiene todas las variables disponibles con documentac
 
 | Variable       | Default                                             | Descripción         |
 | -------------- | --------------------------------------------------- | -------------------- |
-| `CV_PATH`    | `CVs_Principales/CV_Dev_Senior_AI_Improvement.md` | Ruta al archivo CV   |
+| `CV_PATH`    | `cv/resume.md` | Ruta al archivo CV   |
 | `OUTPUT_DIR` | `job_search_agents/results`                       | Directorio de salida |
 | `DATA_DIR`   | `job_search_agents/data`                          | Directorio de datos  |
 
@@ -388,6 +398,7 @@ job_search_agents/
 ├── agents/                      # 🤖 Agentes especializados
 │   ├── orchestrator.py          # Orquestador principal (LangGraph)
 │   ├── linkedin_agent.py        # Agente LinkedIn
+│   ├── computrabajo_agent.py    # Agente Computrabajo Colombia
 │   ├── indeed_agent.py          # Agente Indeed (deshabilitado)
 │   ├── remote_jobs_agent.py     # Agente trabajos remotos
 │   ├── tech_jobs_agent.py       # Agente trabajos técnicos
@@ -410,7 +421,8 @@ job_search_agents/
 │   ├── settings.py               # Configuración del sistema
 │   ├── validators.py            # Validadores Pydantic
 │   ├── config_loader.py         # Cargador de configuración YAML
-│   └── job_sources.yaml         # Fuentes de empleo y keywords
+│   ├── job_sources.yaml         # Valores públicos predeterminados
+│   └── local_search.example.yaml # Ejemplo de preferencias locales
 ├── tools/                       # 🛠️ Herramientas de soporte
 │   ├── web_scraper.py           # Web scraping avanzado
 │   ├── base_api_client.py       # Clase base para clientes API
@@ -453,7 +465,9 @@ job_search_agents/
 
 **Opción 1: Keywords Estáticos (Tradicional)**
 
-Edita `config/job_sources.yaml` para cambiar los keywords base:
+Personaliza `config/local_search.yaml` para cambiar keywords, ubicación y fuentes.
+Cópialo desde `config/local_search.example.yaml`; el archivo local está ignorado
+por Git. `config/job_sources.yaml` conserva valores genéricos para el repositorio.
 
 ```yaml
 keywords:
@@ -466,13 +480,13 @@ keywords:
 
 **Opción 2: Keywords Adaptativos con LLM (Recomendado - NUEVO)**
 
-Si `USE_ADAPTIVE_KEYWORDS=true` (por defecto), el sistema generará automáticamente keywords optimizados para cada fuente y región basándose en tu perfil. Los keywords en `job_sources.yaml` se usan como base y el LLM los adapta dinámicamente.
+Si `USE_ADAPTIVE_KEYWORDS=true` (por defecto), el sistema generará automáticamente keywords optimizados para cada fuente y región basándose en tu perfil. Los keywords de la configuración combinada se usan como base y el LLM los adapta dinámicamente.
 
 **💡 Ventaja**: Los keywords adaptativos mejoran la relevancia en un 30-50% comparado con keywords estáticos.
 
 ### 🔄 Filtrar Fuentes de Empleo
 
-Puedes habilitar/deshabilitar fuentes en `config/job_sources.yaml`:
+Puedes habilitar/deshabilitar fuentes en `config/local_search.yaml`:
 
 ```yaml
 job_sources:
@@ -577,7 +591,7 @@ Archivo generado en `results/job_search_results_YYYYMMDD_HHMMSS.html` con:
 
 **Solución**:
 
-- Si `LLM_PROVIDER=anthropic`, configura `ANTHROPIC_API_KEY`
+- Si `LLM_PROVIDER=huggingface`, configura `HF_TOKEN` y las variables `HF_*`
 - Si `LLM_PROVIDER=openai`, configura `OPENAI_API_KEY`
 - Verifica que la variable esté en tu archivo `.env`
 
@@ -612,7 +626,7 @@ playwright install chromium
    ```env
    CV_PATH=C:\ruta\completa\a\tu\cv.md
    ```
-3. O coloca tu CV en la ruta por defecto: `CVs_Principales/CV_Dev_Senior_AI_Improvement.md`
+3. O coloca tu CV en la ruta por defecto: `cv/resume.md`
 
 ### ⚠️ LinkedIn bloqueando requests
 
@@ -648,7 +662,7 @@ SEARCH_TIMEOUT=60  # Aumentar timeout a 60 segundos
 
 **Solución**:
 
-1. Revisa `config/job_sources.yaml` y verifica que las fuentes estén habilitadas
+1. Revisa `config/local_search.yaml` y verifica que las fuentes estén habilitadas
 2. Ajusta los keywords para ser más generales
 3. Reduce `MIN_MATCH_SCORE` para ver más resultados
 
@@ -831,7 +845,7 @@ Edita `templates/results_template.html` para personalizar el diseño del reporte
            # Implementación
    ```
 3. Agrega el agente al orquestador en `agents/orchestrator.py`
-4. Configura en `config/job_sources.yaml`:
+4. Configura en `config/local_search.yaml`:
    ```yaml
    nueva_fuente:
      enabled: true

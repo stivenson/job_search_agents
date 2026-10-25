@@ -5,7 +5,7 @@ import time
 import logging
 import random
 from typing import List, Dict, Optional
-from urllib.parse import urlencode, urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse, urlunsplit
 from playwright.async_api import async_playwright, Browser, Page, TimeoutError as PlaywrightTimeoutError
 from bs4 import BeautifulSoup
 import requests
@@ -265,7 +265,10 @@ class WebScraper:
                 
                 # Esperar selector específico si se proporciona
                 if wait_selector:
-                    await page.wait_for_selector(wait_selector, timeout=10000)
+                    try:
+                        await page.wait_for_selector(wait_selector, timeout=10000)
+                    except PlaywrightTimeoutError:
+                        logger.warning("Selector %s no apareció en %s; se analizará el HTML disponible", wait_selector, url)
                 
                 # Esperar un poco más para que cargue JavaScript (reducido en FAST_MODE)
                 if FAST_MODE:
@@ -570,56 +573,218 @@ class SimpleHTTPScraper:
         return BeautifulSoup(html, 'html.parser')
 
 
-async def scrape_linkedin_jobs(keywords: List[str], max_results: int = 50, location: Optional[str] = None) -> List[Dict]:
-    """Scraping básico de LinkedIn Jobs con filtro de ubicación opcional."""
-    # Nota: LinkedIn tiene protección anti-scraping fuerte
-    # Esta es una implementación básica que puede necesitar mejoras
+async def scrape_linkedin_jobs(
+    keywords: List[str], max_results: int = 50, location: Optional[str] = None,
+    base_url: str = "https://www.linkedin.com/jobs/search", max_keywords: int = 3,
+) -> List[Dict]:
+    """Scraping básico de LinkedIn Jobs con filtro de ubicación opcional y paginación."""
+    from urllib.parse import quote
     jobs = []
-    
+    seen_urls: set = set()
+    page_size = 25  # LinkedIn devuelve ~25 resultados por página
+
     async with WebScraper() as scraper:
-        for keyword in keywords[:3]:  # Limitar keywords para evitar rate limiting
-            try:
-                # Construir URL de búsqueda de LinkedIn Jobs con ubicación opcional
-                if location:
-                    # URLencode location para URL
-                    from urllib.parse import quote
-                    location_encoded = quote(location)
-                    search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword}&location={location_encoded}&f_TPR=r86400&f_JT=P&f_WT=2"
-                else:
-                    search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword}&f_TPR=r86400&f_JT=P&f_WT=2"
-                
-                html = await scraper.fetch_page(search_url, wait_selector=".jobs-search__results-list")
-                soup = scraper.parse_html(html)
-                
-                # Buscar elementos de trabajo (selectores pueden cambiar)
-                job_cards = soup.select(".job-search-card, .base-card")
-                
-                for card in job_cards[:max_results // len(keywords)]:
-                    try:
-                        title_elem = card.select_one(".base-search-card__title, h3")
-                        company_elem = card.select_one(".base-search-card__subtitle, h4")
-                        location_elem = card.select_one(".job-search-card__location")
-                        link_elem = card.select_one("a")
-                        
-                        if title_elem:
-                            job = {
-                                'title': scraper.extract_text(title_elem),
-                                'company': scraper.extract_text(company_elem),
-                                'location': scraper.extract_text(location_elem),
-                                'url': link_elem.get('href', '') if link_elem else '',
-                                'source': 'linkedin',
-                                'keywords': [keyword]
-                            }
-                            if job['url']:
-                                jobs.append(job)
-                    except Exception as e:
-                        logger.warning(f"Error procesando card de LinkedIn: {e}")
-                        continue
-                
-            except Exception as e:
-                logger.error(f"Error scraping LinkedIn para keyword {keyword}: {e}")
+        selected_keywords = keywords[:max_keywords]
+        per_keyword_quota = (max_results + max(len(selected_keywords), 1) - 1) // max(len(selected_keywords), 1)
+        for keyword in selected_keywords:
+            if len(jobs) >= max_results:
+                break
+            keyword_quota = per_keyword_quota
+            collected = 0
+            start = 0
+
+            while collected < keyword_quota:
+                try:
+                    params = {"keywords": keyword, "start": start}
+                    if location:
+                        params["location"] = location
+                    search_url = f"{base_url}?{urlencode(params)}"
+
+                    html = await scraper.fetch_page(search_url, wait_selector=".jobs-search__results-list")
+                    soup = scraper.parse_html(html)
+
+                    job_cards = soup.select(".job-search-card, .base-card")
+                    if not job_cards:
+                        page_text = soup.get_text(" ", strip=True).lower()
+                        if any(marker in page_text for marker in ("security verification", "verify your identity", "join linkedin", "sign in to linkedin")):
+                            logger.warning("LinkedIn devolvió una página de acceso/verificación para keyword=%r, location=%r", keyword, location)
+                        else:
+                            logger.warning("LinkedIn no mostró tarjetas reconocibles para keyword=%r, location=%r; revise job_search.log y el HTML de respuesta", keyword, location)
+                        break  # Sin más resultados en esta keyword
+
+                    for card in job_cards:
+                        if collected >= keyword_quota or len(jobs) >= max_results:
+                            break
+                        try:
+                            title_elem = card.select_one(".base-search-card__title, h3")
+                            company_elem = card.select_one(".base-search-card__subtitle, h4")
+                            location_elem = card.select_one(".job-search-card__location")
+                            link_elem = card.select_one("a")
+
+                            url = urljoin(base_url, link_elem.get('href', '')) if link_elem else ''
+                            if not url:
+                                continue
+                            canonical = urlparse(url)
+                            canonical_url = urlunsplit((canonical.scheme, canonical.netloc.lower(), canonical.path.rstrip('/'), '', ''))
+                            if canonical_url in seen_urls:
+                                continue
+                            seen_urls.add(canonical_url)
+
+                            if title_elem:
+                                jobs.append({
+                                    'title': scraper.extract_text(title_elem),
+                                    'company': scraper.extract_text(company_elem),
+                                    'location': scraper.extract_text(location_elem),
+                                    'url': url,
+                                    'source': 'linkedin',
+                                    'keywords': [keyword]
+                                })
+                                collected += 1
+                        except Exception as e:
+                            logger.warning(f"Error procesando card de LinkedIn: {e}")
+                            continue
+
+                    if len(job_cards) < page_size:
+                        break  # Última página disponible
+                    start += page_size
+
+                except Exception as e:
+                    logger.error(f"Error scraping LinkedIn para keyword '{keyword}' (start={start}): {e}")
+                    break
+
+    return jobs
+
+
+def scrape_computrabajo_jobs(
+    keywords: List[str],
+    max_results: int = 50,
+    location: str = "",
+    base_url: str = "https://co.computrabajo.com",
+    search_path_template: str = "/trabajo-de-{keyword}-en-{city}",
+    location_terms: Optional[List[str]] = None,
+) -> List[Dict]:
+    """Busca vacantes locales en las páginas públicas de Computrabajo Colombia.
+
+    Se limita a una página por keyword y solo acepta tarjetas cuya ubicación
+    confirme la ciudad o región solicitada; el portal puede agregar resultados
+    de otras ciudades al final de algunas búsquedas.
+    """
+    import re
+    import unicodedata
+
+    from urllib.parse import quote
+
+    base_url = base_url.rstrip("/")
+    jobs: List[Dict] = []
+    seen_urls = set()
+
+    def slugify(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+        return re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-")
+
+    location_parts = [part.strip() for part in location.split(",") if part.strip()]
+    city_slug = slugify(location_parts[0]) if location_parts else ""
+    terms_to_match = [str(term) for term in (location_terms or []) if str(term).strip()]
+    if not terms_to_match:
+        # Exclude the final component, commonly the country, to avoid accepting
+        # unrelated listings from anywhere in that country.
+        terms_to_match = location_parts[:-1] if len(location_parts) > 1 else location_parts
+    normalized_terms = [slugify(term).replace("-", " ") for term in terms_to_match if slugify(term)]
+
+    for keyword in keywords:
+        if len(jobs) >= max_results:
+            break
+        keyword_slug = slugify(keyword)
+        if not keyword_slug:
+            continue
+        search_path = search_path_template.format(keyword=quote(keyword_slug), city=city_slug)
+        url = urljoin(base_url + "/", search_path.lstrip("/"))
+        try:
+            # Use a normal, low-rate public-page request. If Computrabajo asks
+            # for verification or denies access, stop instead of attempting to
+            # evade that control.
+            response = requests.get(
+                url,
+                timeout=20,
+                headers={"Accept-Language": "es-CO,es;q=0.9"},
+            )
+            if response.status_code in (403, 429):
+                logger.warning("Computrabajo respondió HTTP %s; se detiene la fuente", response.status_code)
+                break
+            response.raise_for_status()
+            html = response.text
+            soup = BeautifulSoup(html, "html.parser")
+            time.sleep(max(SCRAPING_DELAY, 1.0))
+            if any(token in soup.get_text(" ", strip=True).casefold() for token in ("verify that you're not a robot", "verifica que no eres un robot", "no eres un robot")):
+                logger.warning("Computrabajo solicitó verificación; se detiene la fuente sin intentar eludirla")
+                break
+
+            cards = soup.select("article.box_offer, article[class*='offer'], div.box_offer")
+            if not cards:
+                logger.warning("Computrabajo no mostró tarjetas reconocibles para la consulta %r", keyword)
                 continue
-    
+
+            for card in cards:
+                title_elem = card.select_one("a.js-o-link, a[href*='/ofertas-de-trabajo/oferta-de-trabajo']")
+                if not title_elem:
+                    continue
+                title = title_elem.get_text(" ", strip=True)
+                href = title_elem.get("href", "")
+                if not title or not href:
+                    continue
+                job_url = urljoin(base_url, href)
+                parsed_url = urlparse(job_url)
+                canonical_url = urlunsplit((parsed_url.scheme, parsed_url.netloc.lower(), parsed_url.path.rstrip("/"), "", ""))
+                if canonical_url in seen_urls:
+                    continue
+
+                lines = [line.strip() for line in card.get_text("\n", strip=True).splitlines() if line.strip()]
+                location_line = next((
+                    line for line in lines
+                    if any(term in slugify(line).replace("-", " ") for term in normalized_terms)
+                ), "")
+                # No atribuir a la ciudad consultada ofertas recomendadas desde
+                # otras regiones si la tarjeta no confirma su ubicación.
+                if not location_line:
+                    continue
+
+                company_elem = card.select_one(".fc_base, [class*='company'], [class*='empresa']")
+                company = company_elem.get_text(" ", strip=True) if company_elem else ""
+                if not company:
+                    for line in lines:
+                        if line == title or line == location_line or line.casefold() in {"aplicar", "guardar en mis favoritos"}:
+                            continue
+                        if re.fullmatch(r"\d[,.]\d", line) or re.search(r"hace \d+", line, re.IGNORECASE):
+                            continue
+                        candidate = re.sub(r"^\d[,.]\d\s+", "", line)
+                        if candidate and candidate != title and len(candidate) < 120:
+                            company = candidate
+                            break
+
+                description_elem = card.select_one("p")
+                description = description_elem.get_text(" ", strip=True) if description_elem else ""
+                modality_text = " ".join([title, location_line, card.get_text(" ", strip=True)]).casefold()
+                is_remote = any(term in modality_text for term in ("remoto", "teletrabajo", "remote"))
+                is_hybrid = any(term in modality_text for term in ("híbrido", "hibrido", "hybrid", "presencial y remoto"))
+                job_mode = "Híbrido" if is_hybrid else "Remoto" if is_remote else "Presencial"
+                seen_urls.add(canonical_url)
+                jobs.append({
+                    "title": title,
+                    "company": company,
+                    "location": f"{job_mode} · {location_line}",
+                    "description": description,
+                    "url": job_url,
+                    "source": "computrabajo",
+                    "search_keywords": [keyword],
+                    "is_remote": is_remote,
+                    "job_mode": job_mode,
+                })
+                if len(jobs) >= max_results:
+                    break
+        except Exception as e:
+            logger.warning("Error buscando en Computrabajo para %r (%s): %s", keyword, url, e)
+
+    logger.info("Encontrados %s trabajos locales en Computrabajo", len(jobs))
     return jobs
 
 

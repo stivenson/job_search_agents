@@ -40,7 +40,9 @@ pip install -r requirements.txt
 # 2. Install Playwright
 playwright install chromium
 
-# 3. Configure .env (copy from env.example)
+# 3. Configure your private environment and search preferences
+cp env.example .env
+cp config/local_search.example.yaml config/local_search.yaml
 
 # 4. 🚀 START THE SYSTEM
 python main.py
@@ -75,11 +77,11 @@ python main.py
 
 ### 🔍 Supported Job Sources
 
-![LinkedIn](https://img.shields.io/badge/LinkedIn-Supported-0077B5?style=flat-square&logo=linkedin&logoColor=white) ![RemoteOK](https://img.shields.io/badge/RemoteOK-Supported-00C853?style=flat-square) ![Stack Overflow](https://img.shields.io/badge/Stack%20Overflow-Supported-F58025?style=flat-square&logo=stackoverflow&logoColor=white) ![GitHub Jobs](https://img.shields.io/badge/GitHub%20Jobs-Supported-181717?style=flat-square&logo=github&logoColor=white) ![Findjobit](https://img.shields.io/badge/Findjobit-Supported-FF6B6B?style=flat-square)
+![LinkedIn](https://img.shields.io/badge/LinkedIn-Supported-0077B5?style=flat-square&logo=linkedin&logoColor=white) ![Computrabajo](https://img.shields.io/badge/Computrabajo-Supported-FF6B00?style=flat-square) ![RemoteOK](https://img.shields.io/badge/RemoteOK-Supported-00C853?style=flat-square) ![Stack Overflow](https://img.shields.io/badge/Stack%20Overflow-Supported-F58025?style=flat-square&logo=stackoverflow&logoColor=white) ![GitHub Jobs](https://img.shields.io/badge/GitHub%20Jobs-Supported-181717?style=flat-square&logo=github&logoColor=white) ![Findjobit](https://img.shields.io/badge/Findjobit-Supported-FF6B6B?style=flat-square)
 
 </div>
 
-- **🔍 Multi-Source Search**: Searches LinkedIn, RemoteOK, We Work Remotely, Stack Overflow Jobs, GitHub Jobs, Findjobit
+- **🔍 Multi-Source Search**: Supports LinkedIn and Computrabajo for local Colombia searches, plus configurable remote/global sources
 - **🤖 Specialized Agents**: Each source has its own optimized agent with advanced anti-bot techniques
 - **📧 Intelligent Email Extraction**: Uses LLMs to extract contact emails from job descriptions
 - **🎯 Intelligent Matching**: Calculates match score between jobs and your profile using heuristic matching + deep semantic analysis with LLM (hybrid)
@@ -187,22 +189,30 @@ The system requires the following variables to function:
 |----------|-------------|---------|
 | `USER_EMAIL` | Your contact email | `your_email@example.com` |
 | `USER_PHONE` | Your phone (with country code) | `+1234567890` |
-| `ANTHROPIC_API_KEY` | Anthropic API key (if `LLM_PROVIDER=anthropic`) | `sk-ant-api03-...` |
-| `OPENAI_API_KEY` | OpenAI API key (if `LLM_PROVIDER=openai`) | `sk-...` |
+| `HF_TOKEN` | Hugging Face token (if `LLM_PROVIDER=huggingface`) | `hf_...` |
+| `HF_API_BASE_URL` | Hugging Face OpenAI-compatible endpoint | `https://router.huggingface.co/v1` |
+| `HF_PLANNER_MODEL` | Model for keyword/query planning | `moonshotai/Kimi-K3` |
+| `HF_EXTRACTOR_MODEL` | Model for extraction and semantic matching | `Qwen/Qwen3.6-27B` |
+| `HF_MODEL_ROUTE` | Inference Router route | `fastest` |
+| `HF_TIMEOUT_SECONDS` | Request timeout | `90` |
 
 **⚠️ Important**: The system will validate these variables at startup and fail with a clear message if they are missing.
 
 ### 🔑 API Key Configuration
 
-#### To use Anthropic (Claude):
+#### To use Hugging Face Inference:
 
 ```env
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=your_api_key_here
-LLM_MODEL=claude-3-5-sonnet-20241022
+LLM_PROVIDER=huggingface
+HF_TOKEN=your_huggingface_token_here
+HF_API_BASE_URL=https://router.huggingface.co/v1
+HF_PLANNER_MODEL=moonshotai/Kimi-K3
+HF_EXTRACTOR_MODEL=Qwen/Qwen3.6-27B
+HF_MODEL_ROUTE=fastest
+HF_TIMEOUT_SECONDS=90
 ```
 
-Get your API key at: https://console.anthropic.com/
+Set `HF_TOKEN` to a Hugging Face token with access to the Inference Router.
 
 #### To use OpenAI:
 
@@ -221,22 +231,24 @@ The system looks for your resume at the configured path. You can specify it in t
 #### Option 1: Absolute path (recommended for Windows)
 
 ```env
-CV_PATH=C:\Users\YourUser\Mi hoja de vida\CVs_Principales\CV_Dev_Senior_AI_Improvement.md
+CV_PATH=C:\Users\YourUser\Documents\cv\resume.md
 ```
 
 #### Option 2: Relative path (portable)
 
 ```env
-CV_PATH=../CVs_Principales/CV_Dev_Senior_AI_Improvement.md
+CV_PATH=../cv/resume.md
 ```
 
 #### Option 3: Default value
 
 If you don't specify `CV_PATH`, the system will use:
 ```
-CVs_Principales/CV_Dev_Senior_AI_Improvement.md
+cv/resume.md
 ```
-(relative to the project base directory)
+inside the project. The `cv/` directory is excluded from Git to prevent
+publishing personal resumes. Relative `CV_PATH`, `OUTPUT_DIR`, and `DATA_DIR`
+values resolve from the project root.
 
 ## 📚 Complete Environment Variables
 
@@ -246,9 +258,9 @@ The `env.example` file contains all available variables with complete documentat
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | If `LLM_PROVIDER=anthropic` | Anthropic API key |
+| `HF_TOKEN` | If `LLM_PROVIDER=huggingface` | Hugging Face token |
 | `OPENAI_API_KEY` | If `LLM_PROVIDER=openai` | OpenAI API key |
-| `LLM_PROVIDER` | No (default: `openai`) | `openai` or `anthropic` |
+| `LLM_PROVIDER` | Yes | `huggingface`, `openai`, or `anthropic` |
 | `LLM_MODEL` | No (default: `gpt-4o-mini`) | Model to use |
 
 ### 👤 User Profile
@@ -321,7 +333,7 @@ The `env.example` file contains all available variables with complete documentat
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CV_PATH` | `CVs_Principales/CV_Dev_Senior_AI_Improvement.md` | Path to resume file |
+| `CV_PATH` | `cv/resume.md` | Path to resume file |
 | `OUTPUT_DIR` | `job_search_agents/results` | Output directory |
 | `DATA_DIR` | `job_search_agents/data` | Data directory |
 
@@ -386,6 +398,7 @@ job_search_agents/
 ├── agents/                      # 🤖 Specialized agents
 │   ├── orchestrator.py          # Main orchestrator (LangGraph)
 │   ├── linkedin_agent.py        # LinkedIn agent
+│   ├── computrabajo_agent.py    # Computrabajo Colombia agent
 │   ├── indeed_agent.py          # Indeed agent (disabled)
 │   ├── remote_jobs_agent.py     # Remote jobs agent
 │   ├── tech_jobs_agent.py       # Tech jobs agent
@@ -406,7 +419,8 @@ job_search_agents/
 │   ├── settings.py               # System configuration
 │   ├── validators.py            # Pydantic validators
 │   ├── config_loader.py         # YAML config loader
-│   └── job_sources.yaml         # Job sources and keywords
+│   ├── job_sources.yaml         # Public default values
+│   └── local_search.example.yaml # Example local preferences
 ├── tools/                       # 🛠️ Support tools
 │   ├── web_scraper.py           # Advanced web scraping
 │   ├── base_api_client.py       # Base API client class
@@ -449,7 +463,9 @@ job_search_agents/
 
 **Option 1: Static Keywords (Traditional)**
 
-Edit `config/job_sources.yaml` to change base keywords:
+Customize `config/local_search.yaml` for keywords, location, and sources. Copy
+it from `config/local_search.example.yaml`; the local override is ignored by Git.
+`config/job_sources.yaml` keeps generic repository defaults.
 
 ```yaml
 keywords:
@@ -462,13 +478,13 @@ keywords:
 
 **Option 2: Adaptive Keywords with LLM (Recommended - NEW)**
 
-If `USE_ADAPTIVE_KEYWORDS=true` (default), the system will automatically generate optimized keywords for each source and region based on your profile. Keywords in `job_sources.yaml` are used as a base and the LLM adapts them dynamically.
+If `USE_ADAPTIVE_KEYWORDS=true` (default), the system will automatically generate optimized keywords for each source and region based on your profile. Keywords from the merged configuration are used as a base and the LLM adapts them dynamically.
 
 **💡 Advantage**: Adaptive keywords improve relevance by 30-50% compared to static keywords.
 
 ### 🔄 Filter Job Sources
 
-You can enable/disable sources in `config/job_sources.yaml`:
+You can enable/disable sources in `config/local_search.yaml`:
 
 ```yaml
 job_sources:
@@ -571,7 +587,7 @@ File generated at `results/job_search_results_YYYYMMDD_HHMMSS.html` with:
 **Cause**: Missing API key for the configured provider.
 
 **Solution**:
-- If `LLM_PROVIDER=anthropic`, configure `ANTHROPIC_API_KEY`
+- If `LLM_PROVIDER=huggingface`, configure `HF_TOKEN` and the `HF_*` variables
 - If `LLM_PROVIDER=openai`, configure `OPENAI_API_KEY`
 - Verify that the variable is in your `.env` file
 
@@ -603,7 +619,7 @@ playwright install chromium
    ```env
    CV_PATH=C:\full\path\to\your\resume.md
    ```
-3. Or place your resume at the default path: `CVs_Principales/CV_Dev_Senior_AI_Improvement.md`
+3. Or place your resume at the default path: `cv/resume.md`
 
 ### ⚠️ LinkedIn blocking requests
 
@@ -636,7 +652,7 @@ SEARCH_TIMEOUT=60  # Increase timeout to 60 seconds
 **Cause**: Keywords too specific or disabled sources.
 
 **Solution**:
-1. Review `config/job_sources.yaml` and verify that sources are enabled
+1. Review `config/local_search.yaml` and verify that sources are enabled
 2. Adjust keywords to be more general
 3. Reduce `MIN_MATCH_SCORE` to see more results
 
@@ -819,7 +835,7 @@ Edit `templates/results_template.html` to customize the report design. The templ
            # Implementation
    ```
 3. Add the agent to the orchestrator in `agents/orchestrator.py`
-4. Configure in `config/job_sources.yaml`:
+4. Configure in `config/local_search.yaml`:
    ```yaml
    new_source:
      enabled: true

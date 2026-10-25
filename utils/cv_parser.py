@@ -1,4 +1,4 @@
-"""Parser para extraer información estructurada del CV en Markdown."""
+"""Parser para extraer información estructurada de CVs en Markdown o PDF."""
 
 import json
 import re
@@ -14,7 +14,7 @@ from config.settings import CV_PATH, DATA_DIR
 
 
 class CVParser:
-    """Extrae información estructurada del CV markdown."""
+    """Extrae información estructurada del CV."""
     
     def __init__(self, cv_path: Optional[Path] = None):
         self.cv_path = cv_path or CV_PATH
@@ -24,14 +24,24 @@ class CVParser:
         """Parsea el CV y retorna un diccionario estructurado."""
         if not self.cv_path.exists():
             raise FileNotFoundError(f"CV no encontrado en: {self.cv_path}")
-        
-        with open(self.cv_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+
+        if self.cv_path.suffix.lower() == ".pdf":
+            from pypdf import PdfReader
+
+            reader = PdfReader(str(self.cv_path))
+            content = "\n".join(page.extract_text() or "" for page in reader.pages)
+            if not content.strip():
+                raise ValueError(f"No se pudo extraer texto del CV PDF: {self.cv_path}")
+            content = self._normalize_pdf_text(content)
+        else:
+            with open(self.cv_path, 'r', encoding='utf-8') as f:
+                content = f.read()
         
         profile = {
             'personal_info': self._extract_personal_info(content),
             'summary': self._extract_summary(content),
             'experience': self._extract_experience(content),
+            'experience_text': self._extract_section_text(content, 'Work Experience'),
             'skills': self._extract_skills(content),
             'education': self._extract_education(content),
             'projects': self._extract_projects(content),
@@ -44,6 +54,36 @@ class CVParser:
             json.dump(profile, f, indent=2, ensure_ascii=False)
         
         return profile
+
+    def _normalize_pdf_text(self, content: str) -> str:
+        """Normaliza encabezados y viñetas para reutilizar los extractores Markdown."""
+        section_names = (
+            'Professional Summary', 'Work Experience', 'Skills',
+            'Education', 'Projects', 'Certifications'
+        )
+        normalized_lines = []
+        for line in content.replace('\x0c', '\n').replace('\u2022', '- ').splitlines():
+            stripped = line.strip()
+            if not stripped:
+                normalized_lines.append('')
+                continue
+
+            heading = next(
+                (name for name in section_names if stripped.rstrip(':').casefold() == name.casefold()),
+                None
+            )
+            normalized_lines.append(f'## {heading}' if heading else stripped)
+
+        return '\n'.join(normalized_lines)
+
+    def _extract_section_text(self, content: str, heading: str) -> str:
+        """Devuelve el texto de una sección hasta el siguiente encabezado principal."""
+        match = re.search(
+            rf'^## {re.escape(heading)}\s*$\n(.+?)(?=^## |\Z)',
+            content,
+            re.MULTILINE | re.DOTALL | re.IGNORECASE
+        )
+        return match.group(1).strip() if match else ''
     
     def _extract_personal_info(self, content: str) -> Dict:
         """Extrae información personal."""
@@ -128,6 +168,40 @@ class CVParser:
                 'bullets': bullets,
                 'technologies': techs
             })
+
+        # PDF extraction often flattens headings and bold markup. Recover entries
+        # from period lines such as "Marzo 2021 - Julio 2025" as a fallback.
+        if not experiences:
+            lines = [line.strip() for line in exp_section.splitlines()]
+            period_re = re.compile(
+                r"^(?:(?:ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|"
+                r"jul(?:io)?|ago(?:sto)?|sep(?:tiembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?|"
+                r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|"
+                r"aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|actualidad|present)"
+                r"\s+)?\d{4}\s*[-–—]\s*(?:(?:[\wáéíóú]+)\s+)?(?:\d{4}|actualidad|present)$",
+                re.IGNORECASE,
+            )
+            period_indexes = [i for i, line in enumerate(lines) if period_re.match(line)]
+            for pos, period_index in enumerate(period_indexes):
+                before = [line for line in lines[max(0, period_index - 2):period_index] if line]
+                if not before:
+                    continue
+                title = before[-1]
+                company = before[-2] if len(before) > 1 else ""
+                next_period = period_indexes[pos + 1] if pos + 1 < len(period_indexes) else len(lines)
+                # The next role's company/title appear immediately before its date.
+                description_end = max(period_index + 1, next_period - 2) if pos + 1 < len(period_indexes) else next_period
+                description = "\n".join(lines[period_index + 1:description_end]).strip()
+                if not description and pos + 1 < len(period_indexes):
+                    description = "\n".join(lines[period_index + 1:next_period]).strip()
+                experiences.append({
+                    "company": company,
+                    "title": title,
+                    "period": lines[period_index],
+                    "description": description,
+                    "bullets": [re.sub(r"^[-*•\s]+", "", line) for line in description.splitlines() if line.strip()],
+                    "technologies": self._extract_technologies(description),
+                })
         
         return experiences
     
@@ -164,6 +238,16 @@ class CVParser:
                 cleaned_items.append(item)
             
             skills[category] = cleaned_items
+
+        # Los PDFs suelen perder los subtítulos y el formato de listas al extraer texto.
+        if not skills:
+            items = [
+                re.sub(r'^[-*•\s]+', '', line).strip()
+                for line in skills_section.splitlines()
+                if line.strip() and not line.lstrip().startswith('#')
+            ]
+            if items:
+                skills['Skills'] = items
         
         return skills
     

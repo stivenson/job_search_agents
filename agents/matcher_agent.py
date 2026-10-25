@@ -2,17 +2,13 @@
 
 import logging
 from typing import List, Dict, Optional
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.documents import Document
 import json
-import yaml
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config.settings import DATA_DIR, LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY, MIN_MATCH_SCORE
+from config.settings import DATA_DIR, MIN_MATCH_SCORE
+from config.config_loader import load_job_sources_config
 
 logger = logging.getLogger(__name__)
 
@@ -37,53 +33,23 @@ class MatcherAgent:
         self.employment_type_scores = self._get_employment_type_scores()
         self.location_terms = self._get_location_terms()
         self.location_scores = self._get_location_scores()
+        self.locality_terms = self._get_locality_terms()
         self.experience_level_terms = self._get_experience_level_terms()
         self.experience_level_scores = self._get_experience_level_scores()
-        self.relevant_keywords = self._get_relevant_keywords()
-        
-        # Inicializar embeddings (requiere OpenAI para embeddings)
-        if OPENAI_API_KEY:
-            self.embeddings = OpenAIEmbeddings()
-        else:
-            logger.warning("No hay OpenAI API key, usando matching basado en keywords")
-            self.embeddings = None
-        
-        # Inicializar LLM para análisis semántico
-        if LLM_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
-            self.llm = ChatAnthropic(
-                model=LLM_MODEL if "claude" in LLM_MODEL.lower() else "claude-3-5-sonnet-20241022",
-                temperature=0
-            )
-        elif OPENAI_API_KEY:
-            self.llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
-        else:
-            self.llm = None
+        self.relevant_keyword_groups = self._get_relevant_keyword_groups()
+
+        # This matcher currently uses deterministic keyword scoring; avoid
+        # constructing unused OpenAI clients when another provider is selected.
+        self.embeddings = None
+        self.llm = None
     
     def _load_language_preferences(self) -> Dict:
         """Carga preferencias de idioma desde job_sources.yaml."""
-        config_path = Path(__file__).parent.parent / "config" / "job_sources.yaml"
-        if config_path.exists():
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                return config.get('language_preferences', {})
-            except Exception as e:
-                logger.warning(f"Error cargando preferencias de idioma: {e}")
-                return {}
-        return {}
+        return load_job_sources_config().get('language_preferences', {})
     
     def _load_matching_config(self) -> Dict:
         """Carga configuración de matching desde job_sources.yaml."""
-        config_path = Path(__file__).parent.parent / "config" / "job_sources.yaml"
-        if config_path.exists():
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                return config.get('matching', {})
-            except Exception as e:
-                logger.warning(f"Error cargando configuración de matching: {e}")
-                return {}
-        return {}
+        return load_job_sources_config().get('matching', {})
     
     def _get_scoring_weights(self) -> Dict[str, int]:
         """Obtiene pesos de scoring con valores por defecto."""
@@ -135,6 +101,11 @@ class MatcherAgent:
             'other': scores.get('other', 0)
         }
     
+    def _get_locality_terms(self) -> List[str]:
+        """Términos locales configurados, sin asumir una ciudad concreta."""
+        terms = self.matching_config.get('locality_terms', [])
+        return [str(term).casefold() for term in terms if str(term).strip()] if isinstance(terms, list) else []
+
     def _get_experience_level_terms(self) -> Dict[str, List[str]]:
         """Obtiene términos de nivel de experiencia con valores por defecto."""
         terms = self.matching_config.get('experience_level_terms', {})
@@ -153,42 +124,27 @@ class MatcherAgent:
             'junior': scores.get('junior', 3)
         }
     
-    def _get_relevant_keywords(self) -> List[str]:
-        """Obtiene keywords relevantes, infiriendo de YAML si está vacío."""
-        configured_keywords = self.matching_config.get('relevant_keywords', [])
-        
-        # Si hay keywords configurados, usarlos
-        if configured_keywords:
-            return [kw.lower() for kw in configured_keywords]
-        
-        # Si no, inferir de keywords + skills_required del YAML principal
-        config_path = Path(__file__).parent.parent / "config" / "job_sources.yaml"
-        if config_path.exists():
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                
-                keywords = config.get('keywords', [])
-                skills_required = config.get('skills_required', [])
-                
-                # Combinar y extraer palabras clave
-                all_keywords = set()
-                for kw in keywords + skills_required:
-                    # Extraer palabras individuales de frases
-                    words = kw.lower().split()
-                    all_keywords.update(words)
-                
-                return list(all_keywords)
-            except Exception as e:
-                logger.warning(f"Error infiriendo keywords relevantes: {e}")
-        
-        # Fallback a la lista hardcodeada original
-        return ['ai', 'machine learning', 'llm', 'llmops', 'mlops', 'python', 'aws', 'gcp']
+    def _get_relevant_keyword_groups(self) -> List[List[str]]:
+        """Obtiene grupos configurables de términos para scoring profesional."""
+        configured = self.matching_config.get('relevant_keyword_groups', {})
+        if isinstance(configured, dict):
+            groups = [
+                [str(term).casefold() for term in terms if str(term).strip()]
+                for terms in configured.values()
+                if isinstance(terms, list)
+            ]
+            groups = [group for group in groups if group]
+            if groups:
+                return groups
+
+        # Compatibilidad con la configuración anterior de keywords planos.
+        legacy_keywords = self.matching_config.get('relevant_keywords', [])
+        return [[str(term).casefold()] for term in legacy_keywords if str(term).strip()]
     
     def _load_profile(self) -> Dict:
         """Carga el perfil del usuario."""
         if not self.profile_path.exists():
-            logger.warning(f"Perfil no encontrado en {self.profile_path}, usando perfil vacío")
+            logger.debug(f"Perfil aún no parseado en {self.profile_path}; se actualizará desde el CV")
             return {}
         
         with open(self.profile_path, 'r', encoding='utf-8') as f:
@@ -243,6 +199,12 @@ class MatcherAgent:
         for proj in self.profile.get('projects', []):
             if isinstance(proj, dict):
                 skills.extend(proj.get('technologies', []))
+
+        # En CVs PDF el texto de experiencia puede estar disponible sin separar
+        # cada empleo; recuperar de allí las tecnologías explícitas.
+        experience_text = self.profile.get('experience_text', '')
+        if experience_text:
+            skills.extend(self._extract_tech_keywords(experience_text))
         
         return list(set(skills))
     
@@ -375,9 +337,14 @@ class MatcherAgent:
     
     def _calculate_location_score(self, location: str, job_text: str, max_score: int) -> int:
         """Calcula score de ubicación usando términos configurados."""
+        combined_text = f"{location} {job_text}".casefold()
+        hybrid = any(term in combined_text for term in ('híbrido', 'hibrido', 'hybrid', 'presencial y remoto'))
+
         # Verificar remote
         for term in self.location_terms['remote']:
-            if term in location or term in job_text:
+            if term in combined_text:
+                if hybrid:
+                    return self.location_scores['occasional_travel']
                 return self.location_scores['remote']
         
         # Verificar occasional travel
@@ -385,8 +352,10 @@ class MatcherAgent:
             if term in job_text:
                 return self.location_scores['occasional_travel']
         
-        # Otros
-        return self.location_scores['other']
+        # Dar el puntaje local completo solo si se confirma la región objetivo.
+        if any(term in location.casefold() for term in self.locality_terms):
+            return self.location_scores['other']
+        return int(max_score * 0.35)
     
     def _calculate_experience_level_score(self, job_text: str, max_score: int) -> int:
         """Calcula score de nivel de experiencia usando términos configurados."""
@@ -429,14 +398,16 @@ class MatcherAgent:
         
         # 1. Match de skills (usar peso configurado)
         weight_skills = self.scoring_weights['skills_match']
-        user_skills = [s.lower() for s in self._extract_skills_from_profile()]
+        user_skills = sorted({s.strip().casefold() for s in self._extract_skills_from_profile() if len(s.strip()) >= 3})
         
         matched_skills = []
         for skill in user_skills:
             if skill in job_text:
                 matched_skills.append(skill)
         
-        skill_score = min(weight_skills, (len(matched_skills) / max(len(user_skills), 1)) * weight_skills)
+        # The CV contains many extracted aliases; divide points across a small
+        # number of independent matches instead of diluting them across every term.
+        skill_score = min(weight_skills, (len(matched_skills) / 3) * weight_skills)
         score += skill_score
         factors['skills_match'] = round(skill_score, 1)
         
@@ -460,9 +431,9 @@ class MatcherAgent:
         
         # 5. Keywords relevantes (usar keywords configurados/inferidos)
         weight_keywords = self.scoring_weights['relevant_keywords']
-        relevant_keywords = self.relevant_keywords
-        keyword_matches = sum(1 for kw in relevant_keywords if kw in job_text)
-        keyword_score = min(weight_keywords, (keyword_matches / max(len(relevant_keywords), 1)) * weight_keywords)
+        keyword_groups = self.relevant_keyword_groups
+        keyword_matches = sum(1 for group in keyword_groups if any(term in job_text for term in group))
+        keyword_score = min(weight_keywords, (keyword_matches / min(len(keyword_groups), 3)) * weight_keywords) if keyword_groups else 0
         
         score += keyword_score
         factors['keywords_match'] = round(keyword_score, 1)

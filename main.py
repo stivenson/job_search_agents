@@ -62,6 +62,12 @@ async def main():
             "Emails encontrados": len(emails),
         }
         progress_logger.print_summary_table(summary_data, "📊 Resumen de Resultados")
+
+        if not matched_jobs:
+            progress_logger.print_warning(
+                "La búsqueda terminó sin vacantes encontradas. El reporte está generado, "
+                "pero revisa job_search.log: la fuente puede no haber entregado tarjetas de empleo."
+            )
         
         if errors:
             progress_logger.print_warning(f"Errores encontrados: {len(errors)}")
@@ -86,7 +92,10 @@ async def main():
         if emails:
             progress_logger.print_emails_list(emails, "📧 Emails de Contacto Encontrados", max_items=10)
         
-        progress_logger.print_header("Búsqueda completada exitosamente! 🎉", "✅")
+        if matched_jobs:
+            progress_logger.print_header("Búsqueda completada exitosamente! 🎉", "✅")
+        else:
+            progress_logger.print_header("Búsqueda finalizada sin vacantes", "ℹ️")
         
         return results
         

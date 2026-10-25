@@ -29,28 +29,26 @@ class TechJobsAgent:
             logger.info(f"Buscando trabajos técnicos con keywords: {keywords}")
         
         all_jobs = []
-        
-        # Para trabajos remotos, no podemos filtrar por país específico,
-        # pero podemos marcar la región preferida
-        location_param = None  # Stack Overflow y GitHub Jobs son principalmente remotos
-        
-        # 1. Stack Overflow Jobs (RSS Feed)
-        try:
-            logger.info("Buscando en Stack Overflow Jobs...")
-            so_jobs = self.stackoverflow_client.search_jobs(keywords, self.max_results, location=location_param)
-            all_jobs.extend(so_jobs)
-            logger.info(f"Encontrados {len(so_jobs)} trabajos en Stack Overflow")
-        except Exception as e:
-            logger.error(f"Error buscando en Stack Overflow: {e}")
-        
-        # 2. GitHub Jobs (API)
-        try:
-            logger.info("Buscando en GitHub Jobs...")
-            gh_jobs = self.github_client.search_jobs(keywords, self.max_results)
-            all_jobs.extend(gh_jobs)
-            logger.info(f"Encontrados {len(gh_jobs)} trabajos en GitHub Jobs")
-        except Exception as e:
-            logger.error(f"Error buscando en GitHub Jobs: {e}")
+
+        # Buscar Stack Overflow y GitHub Jobs en paralelo
+        logger.info("Buscando en Stack Overflow y GitHub Jobs en paralelo...")
+        results = await asyncio.gather(
+            self.stackoverflow_client.search_jobs_async(keywords, self.max_results),
+            self.github_client.search_jobs_async(keywords, self.max_results),
+            return_exceptions=True
+        )
+
+        so_jobs, gh_jobs = results
+        if isinstance(so_jobs, Exception):
+            logger.error(f"Error buscando en Stack Overflow: {so_jobs}")
+            so_jobs = []
+        if isinstance(gh_jobs, Exception):
+            logger.error(f"Error buscando en GitHub Jobs: {gh_jobs}")
+            gh_jobs = []
+
+        all_jobs.extend(so_jobs)
+        all_jobs.extend(gh_jobs)
+        logger.info(f"Stack Overflow: {len(so_jobs)} | GitHub Jobs: {len(gh_jobs)}")
         
         # Enriquecer todos los trabajos con metadata de región
         for job in all_jobs:

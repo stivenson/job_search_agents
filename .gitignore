@@ -14,6 +14,10 @@ data/*
 !data/.gitkeep
 !data/profile.json.example
 
+# Configuración local y CVs (nunca versionar datos personales)
+/config/local_search.yaml
+/cv/
+
 # Python
 __pycache__/
 *.py[cod]

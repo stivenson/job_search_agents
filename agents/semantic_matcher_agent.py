@@ -4,8 +4,6 @@ import asyncio
 import logging
 import json
 from typing import List, Dict, Optional
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 import sys
@@ -13,10 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.skill_loader import SkillLoader
-from config.settings import (
-    LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY,
-    EMAIL_EXTRACTION_CONCURRENCY  # Reusar el mismo límite de concurrencia
-)
+from config.settings import EMAIL_EXTRACTION_CONCURRENCY
+from utils.llm_factory import create_chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -34,20 +30,7 @@ class SemanticMatcherAgent:
     """Agente que usa LLM para análisis semántico de relevancia entre trabajos y perfil."""
     
     def __init__(self):
-        # Inicializar LLM según configuración
-        if LLM_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
-            self.llm = ChatAnthropic(
-                model=LLM_MODEL if "claude" in LLM_MODEL.lower() else "claude-3-5-sonnet-20241022",
-                temperature=0  # Consistencia en análisis
-            )
-        elif OPENAI_API_KEY:
-            self.llm = ChatOpenAI(
-                model=LLM_MODEL,
-                temperature=0
-            )
-        else:
-            logger.warning("No hay API key configurada, análisis semántico deshabilitado")
-            self.llm = None
+        self.llm = create_chat_model(purpose="extractor", temperature=0)
         
         # Parser de salida JSON
         self.output_parser = JsonOutputParser(pydantic_object=SemanticMatchResult)
@@ -91,10 +74,16 @@ class SemanticMatcherAgent:
                     exp_summary.append(f"- {role} @ {company}" + (f" (Techs: {', '.join(techs[:5])})" if techs else ""))
             if exp_summary:
                 summary_parts.append(f"**Experiencia Reciente**:\n" + "\n".join(exp_summary))
+
+        experience_text = profile.get('experience_text', '')
+        if experience_text and not experience:
+            summary_parts.append(f"**Experiencia Profesional**:\n{experience_text[:1800]}")
         
         # Nivel estimado
         years = len(experience) if isinstance(experience, list) else 0
-        if years >= 5:
+        if experience_text and not experience:
+            level = "Trayectoria descrita en el CV"
+        elif years >= 5:
             level = "Senior"
         elif years >= 2:
             level = "Mid-level"
@@ -135,7 +124,14 @@ class SemanticMatcherAgent:
             job_title = job.get('title', 'N/A')
             job_company = job.get('company', 'N/A')
             job_location = job.get('location', 'N/A')
-            job_description = job.get('description', job.get('summary', 'N/A'))[:2000]  # Limitar tamaño
+            job_description = job.get('description') or job.get('summary') or ''
+            has_description = bool(job_description.strip())
+            if not has_description:
+                job_description = (
+                    "La tarjeta pública no incluye descripción del cargo. Evalúa solo con el título, "
+                    "empresa y ubicación; evita inferir requisitos y limita la confianza a 45/100."
+                )
+            job_description = job_description[:2000]
             
             # Crear resumen del perfil
             candidate_profile = self._create_candidate_profile_summary(profile)
@@ -168,6 +164,9 @@ class SemanticMatcherAgent:
                 for field in required_fields:
                     if field not in result:
                         result[field] = 0.0 if field in ['semantic_score', 'confidence'] else []
+
+                if not has_description:
+                    result['confidence'] = min(float(result['confidence']), 45.0)
                 
                 logger.debug(f"Análisis semántico completado: {job_title} - Score: {result['semantic_score']}")
                 return result
@@ -267,7 +266,8 @@ class SemanticMatcherAgent:
         heuristic_score: float,
         semantic_score: float,
         heuristic_weight: float = 0.4,
-        semantic_weight: float = 0.6
+        semantic_weight: float = 0.6,
+        confidence: float = 100.0,
     ) -> float:
         """
         Combina score heurístico y semántico con pesos configurables.
@@ -277,6 +277,7 @@ class SemanticMatcherAgent:
             semantic_score: Score del análisis semántico (0-100)
             heuristic_weight: Peso del score heurístico (default: 0.4)
             semantic_weight: Peso del score semántico (default: 0.6)
+            confidence: Confianza de la evaluación semántica (0-100)
         
         Returns:
             Score combinado (0-100)
@@ -285,5 +286,8 @@ class SemanticMatcherAgent:
         if semantic_score == 0.0:
             return heuristic_score
         
-        combined = (heuristic_score * heuristic_weight) + (semantic_score * semantic_weight)
+        confidence_factor = min(1.0, max(0.0, confidence / 100.0))
+        effective_semantic_weight = semantic_weight * confidence_factor
+        effective_heuristic_weight = 1.0 - effective_semantic_weight
+        combined = (heuristic_score * effective_heuristic_weight) + (semantic_score * effective_semantic_weight)
         return min(100, max(0, combined))

@@ -1,6 +1,8 @@
 """Clientes para APIs de job boards."""
 
 import requests
+import aiohttp
+import asyncio
 import logging
 import random
 from typing import List, Dict, Optional
@@ -9,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import (
-    LINKEDIN_API_KEY, INDEED_API_KEY, REMOTEOK_API_KEY, 
+    LINKEDIN_API_KEY, INDEED_API_KEY, REMOTEOK_API_KEY,
     DESCRIPTION_MAX_LENGTH, REQUEST_TIMEOUT,
     USE_USER_AGENT_ROTATION, RANDOM_DELAY_ENABLED,
     MIN_DELAY, MAX_DELAY
@@ -83,7 +85,43 @@ class RemoteOKClient(BaseAPIClient):
             logger.error(f"Error parseando JSON de RemoteOK: {e}")
         except Exception as e:
             logger.error(f"Error inesperado obteniendo trabajos de RemoteOK: {e}")
-        
+
+        return jobs
+
+    async def search_jobs_async(self, keywords: List[str], max_results: int = 100) -> List[Dict]:
+        """Versión async de search_jobs usando aiohttp."""
+        jobs = []
+        try:
+            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(self.base_url) as response:
+                    response.raise_for_status()
+                    data = await response.json(content_type=None)
+
+            for job in data[:max_results]:
+                if isinstance(job, dict) and job.get('id'):
+                    title = job.get('position', '')
+                    description = job.get('description', '')
+                    matches_keyword = not keywords
+                    if keywords:
+                        text_to_search = f"{title} {description}".lower()
+                        matches_keyword = any(kw.lower() in text_to_search for kw in keywords)
+                    if matches_keyword:
+                        jobs.append({
+                            'title': title,
+                            'company': job.get('company', ''),
+                            'location': 'Remote',
+                            'url': job.get('url', ''),
+                            'description': description[:DESCRIPTION_MAX_LENGTH],
+                            'source': 'remoteok',
+                            'keywords': keywords,
+                            'tags': job.get('tags', [])
+                        })
+        except asyncio.TimeoutError:
+            logger.error("Timeout async obteniendo trabajos de RemoteOK")
+        except Exception as e:
+            logger.error(f"Error async obteniendo trabajos de RemoteOK: {e}")
+
         return jobs
 
 
@@ -162,7 +200,52 @@ class StackOverflowJobsClient:
             logger.error(f"Error parseando XML de Stack Overflow: {e}")
         except Exception as e:
             logger.error(f"Error inesperado obteniendo trabajos de Stack Overflow: {e}")
-        
+
+        return jobs
+
+    async def search_jobs_async(self, keywords: List[str], max_results: int = 50, location: Optional[str] = None) -> List[Dict]:
+        """Versión async de search_jobs usando aiohttp."""
+        from xml.etree import ElementTree as ET
+        jobs = []
+        params = {
+            'q': ' OR '.join(keywords) if keywords else '',
+            'l': location or 'Remote',
+            'd': '20',
+            'u': 'Miles'
+        }
+        try:
+            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(self.base_url, params=params) as response:
+                    response.raise_for_status()
+                    content = await response.read()
+
+            root = ET.fromstring(content)
+            for item in root.findall('.//item')[:max_results]:
+                try:
+                    title = item.find('title')
+                    link = item.find('link')
+                    description = item.find('description')
+                    company = item.find('a10:author', {'a10': 'http://www.w3.org/2005/Atom'})
+                    if title is not None and link is not None:
+                        jobs.append({
+                            'title': title.text or '',
+                            'company': company.text if company is not None and company.text else '',
+                            'location': 'Remote',
+                            'url': link.text or '',
+                            'description': (description.text or '')[:DESCRIPTION_MAX_LENGTH],
+                            'source': 'stack_overflow',
+                            'keywords': keywords
+                        })
+                except Exception as e:
+                    logger.warning(f"Error procesando item de Stack Overflow: {e}")
+        except asyncio.TimeoutError:
+            logger.error("Timeout async obteniendo trabajos de Stack Overflow")
+        except ET.ParseError as e:
+            logger.error(f"Error parseando XML async de Stack Overflow: {e}")
+        except Exception as e:
+            logger.error(f"Error async obteniendo trabajos de Stack Overflow: {e}")
+
         return jobs
 
 
@@ -207,7 +290,6 @@ class GitHubJobsClient(BaseAPIClient):
             
         except requests.exceptions.HTTPError as e:
             if e.response and e.response.status_code in [403, 429]:
-                # Rotar User-Agent si hay bloqueo
                 if self.ua_rotator:
                     self.ua_rotator.rotate()
                     self.session.headers.update(self.ua_rotator.get_realistic_headers())
@@ -215,7 +297,39 @@ class GitHubJobsClient(BaseAPIClient):
             logger.error(f"Error obteniendo trabajos de GitHub Jobs: {e}")
         except Exception as e:
             logger.error(f"Error obteniendo trabajos de GitHub Jobs: {e}")
-        
+
+        return jobs
+
+    async def search_jobs_async(self, keywords: List[str], max_results: int = 30) -> List[Dict]:
+        """Versión async de search_jobs usando aiohttp."""
+        jobs = []
+        params = {
+            'description': ' OR '.join(keywords) if keywords else '',
+            'location': 'Remote'
+        }
+        try:
+            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(self.base_url, params=params) as response:
+                    response.raise_for_status()
+                    data = await response.json(content_type=None)
+
+            for job in data[:max_results]:
+                jobs.append({
+                    'title': job.get('title', ''),
+                    'company': job.get('company', ''),
+                    'location': job.get('location', 'Remote'),
+                    'url': job.get('url', ''),
+                    'description': job.get('description', '')[:DESCRIPTION_MAX_LENGTH],
+                    'source': 'github_jobs',
+                    'keywords': keywords,
+                    'type': job.get('type', '')
+                })
+        except asyncio.TimeoutError:
+            logger.error("Timeout async obteniendo trabajos de GitHub Jobs")
+        except Exception as e:
+            logger.error(f"Error async obteniendo trabajos de GitHub Jobs: {e}")
+
         return jobs
 
 

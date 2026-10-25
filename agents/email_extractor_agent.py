@@ -3,8 +3,6 @@
 import asyncio
 import logging
 from typing import List, Dict, Optional
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
@@ -14,10 +12,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from tools.email_validator import EmailValidator
 from utils.skill_loader import SkillLoader
-from config.settings import (
-    LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY,
-    EMAIL_EXTRACTION_CONCURRENCY
-)
+from config.settings import EMAIL_EXTRACTION_CONCURRENCY
+from utils.llm_factory import create_chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -37,20 +33,7 @@ class EmailExtractorAgent:
     def __init__(self):
         self.validator = EmailValidator()
         
-        # Inicializar LLM según configuración
-        if LLM_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
-            self.llm = ChatAnthropic(
-                model=LLM_MODEL if "claude" in LLM_MODEL.lower() else "claude-3-5-sonnet-20241022",
-                temperature=0
-            )
-        elif OPENAI_API_KEY:
-            self.llm = ChatOpenAI(
-                model=LLM_MODEL,
-                temperature=0
-            )
-        else:
-            logger.warning("No hay API key configurada, usando extracción básica con regex")
-            self.llm = None
+        self.llm = create_chat_model(purpose="extractor", temperature=0)
         
         # Parser de salida
         self.output_parser = PydanticOutputParser(pydantic_object=ContactInfo)

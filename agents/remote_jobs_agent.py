@@ -29,24 +29,26 @@ class RemoteJobsAgent:
             logger.info(f"Buscando trabajos remotos con keywords: {keywords}")
         
         all_jobs = []
-        
-        # 1. RemoteOK (API)
-        try:
-            logger.info("Buscando en RemoteOK...")
-            remoteok_jobs = self.remoteok_client.search_jobs(keywords, self.max_results)
-            all_jobs.extend(remoteok_jobs)
-            logger.info(f"Encontrados {len(remoteok_jobs)} trabajos en RemoteOK")
-        except Exception as e:
-            logger.error(f"Error buscando en RemoteOK: {e}")
-        
-        # 2. We Work Remotely (Scraping)
-        try:
-            logger.info("Buscando en We Work Remotely...")
-            wwr_jobs = await scrape_we_work_remotely(self.max_results)
-            all_jobs.extend(wwr_jobs)
-            logger.info(f"Encontrados {len(wwr_jobs)} trabajos en We Work Remotely")
-        except Exception as e:
-            logger.error(f"Error buscando en We Work Remotely: {e}")
+
+        # Buscar RemoteOK y We Work Remotely en paralelo
+        logger.info("Buscando en RemoteOK y We Work Remotely en paralelo...")
+        results = await asyncio.gather(
+            self.remoteok_client.search_jobs_async(keywords, self.max_results),
+            scrape_we_work_remotely(self.max_results),
+            return_exceptions=True
+        )
+
+        remoteok_jobs, wwr_jobs = results
+        if isinstance(remoteok_jobs, Exception):
+            logger.error(f"Error buscando en RemoteOK: {remoteok_jobs}")
+            remoteok_jobs = []
+        if isinstance(wwr_jobs, Exception):
+            logger.error(f"Error buscando en We Work Remotely: {wwr_jobs}")
+            wwr_jobs = []
+
+        all_jobs.extend(remoteok_jobs)
+        all_jobs.extend(wwr_jobs)
+        logger.info(f"RemoteOK: {len(remoteok_jobs)} | We Work Remotely: {len(wwr_jobs)}")
         
         # Enriquecer todos los trabajos con metadata de región
         for job in all_jobs:

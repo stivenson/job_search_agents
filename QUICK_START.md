@@ -9,19 +9,18 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-### 2. Configurar variables de entorno
-Crea un archivo `.env` en el directorio `job_search_agents`:
+### 2. Configurar variables de entorno y preferencias locales
+Copia `env.example` a `.env` y configura una credencial válida para el proveedor
+de LLM elegido. `.env` está excluido de Git.
 
 ```env
-# Requerido: Elige un proveedor de LLM
-OPENAI_API_KEY=sk-tu-api-key-aqui
-# o
-ANTHROPIC_API_KEY=sk-tu-api-key-aqui
-
-# Configuración básica
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4o-mini
+LLM_PROVIDER=huggingface
+HF_TOKEN=tu_token_real
 ```
+
+Copia `config/local_search.example.yaml` a `config/local_search.yaml` para
+personalizar keywords, ubicación y fuentes. El override local está excluido de
+Git. Guarda tu CV en `cv/resume.md` (también excluido) o configura `CV_PATH`.
 
 ### 3. Ejecutar
 ```bash
@@ -35,13 +34,14 @@ El sistema generará un archivo HTML en `job_search_agents/results/` con todos l
 
 - `main.py` - Punto de entrada
 - `config/settings.py` - Configuración del sistema
-- `config/job_sources.yaml` - Keywords y fuentes de búsqueda
-- `CVs_Principales/CV_Dev_Senior_AI_Improvement.md` - CV fuente (debe existir)
+- `config/job_sources.yaml` - Valores públicos predeterminados
+- `config/local_search.example.yaml` - Ejemplo de preferencias locales
+- `cv/resume.md` - CV fuente (debe existir, configurable via `CV_PATH` en `.env`)
 
 ## Personalización rápida
 
 ### Cambiar keywords de búsqueda
-Edita `config/job_sources.yaml`:
+Edita `config/local_search.yaml`:
 ```yaml
 keywords:
   - "AI Engineer"
@@ -56,7 +56,7 @@ MIN_MATCH_SCORE=70  # Solo trabajos con score >= 70
 ```
 
 ### Habilitar/deshabilitar fuentes
-En `config/job_sources.yaml`:
+En `config/local_search.yaml`:
 ```yaml
 job_sources:
   linkedin:
@@ -66,10 +66,10 @@ job_sources:
 ## Troubleshooting
 
 **Error: "CV no encontrado"**
-- Verifica que `CVs_Principales/CV_Dev_Senior_AI_Improvement.md` exista en el directorio padre
+- Verifica que tu CV exista en la ruta configurada (por defecto `cv/resume.md` dentro del proyecto)
 
 **Error: "API key not found"**
-- Verifica que tu `.env` tenga `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`
+- Verifica que tu `.env` tenga una credencial para el proveedor LLM seleccionado
 
 **Error: "Playwright browser not found"**
 ```bash

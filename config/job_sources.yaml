@@ -155,12 +155,14 @@ matching:
     mid: 5
     junior: 3
   
-  # Keywords relevantes para matching (si vacío, se infiere de keywords + skills_required)
+  # Configure ciudad o región en local_search.yaml si aplica.
+  locality_terms: []
+  relevant_keyword_groups: {}
   relevant_keywords: []
 
 # Regiones de búsqueda - Priorizar países hispanos, luego angloparlantes
 search_regions:
-  # Primera fase: Países hispanos (prioridad)
+  # Valores globales de ejemplo; personalizar en local_search.yaml.
   hispanic_countries:
     - "Colombia"
     - "México"
@@ -178,9 +180,7 @@ search_regions:
   # Segunda fase: Países angloparlantes
   english_countries:
     - "United States"
-    - "USA"
     - "United Kingdom"
-    - "UK"
     - "Canada"
     - "Australia"
     - "New Zealand"
@@ -206,6 +206,16 @@ job_sources:
     use_api: false
     max_results: 50
     base_url: "https://www.linkedin.com/jobs/search"
+    max_keywords: 3
+
+  # Fuente regional opcional; activar y configurar la ciudad en local_search.yaml.
+  computrabajo:
+    enabled: false
+    use_api: false
+    base_url: "https://co.computrabajo.com"
+    search_path_template: "/trabajo-de-{keyword}-en-{city}"
+    max_results: 50
+    max_keywords: 8
 
   indeed:
     enabled: false  # Deshabilitado: difícil acceso, bloqueos frecuentes
@@ -232,7 +242,7 @@ job_sources:
     base_url: "https://stackoverflow.com/jobs/feed"
 
   github_jobs:
-    enabled: true
+    enabled: false  # GitHub Jobs fue descontinuado.
     use_api: false
     max_results: 30
     base_url: "https://jobs.github.com/positions.json"

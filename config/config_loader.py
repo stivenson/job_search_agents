@@ -1,6 +1,7 @@
 """Cargador centralizado de configuración YAML."""
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Optional
 import yaml
@@ -10,6 +11,17 @@ logger = logging.getLogger(__name__)
 # Cache para evitar recargar el archivo múltiples veces
 _cached_config: Optional[Dict] = None
 _config_path: Optional[Path] = None
+
+
+def _merge_config(base: Dict, override: Dict) -> Dict:
+    """Merge nested mappings; override lists and scalar values as a whole."""
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_config(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def load_job_sources_config(force_reload: bool = False) -> Dict:
@@ -47,14 +59,32 @@ def load_job_sources_config(force_reload: bool = False) -> Dict:
         logger.error(f"Archivo de configuración no encontrado: {_config_path}")
         return {}
     
-    # Cargar y cachear
+    # Cargar la configuración pública y combinar overrides personales locales.
     try:
         with open(_config_path, 'r', encoding='utf-8') as f:
-            _cached_config = yaml.safe_load(f)
-            logger.debug(f"Configuración cargada desde {_config_path}")
-            return _cached_config
+            base_config = yaml.safe_load(f) or {}
+        if not isinstance(base_config, dict):
+            raise ValueError(f"La configuración base debe ser un mapping YAML: {_config_path}")
+
+        override_path = Path(
+            os.getenv("JOB_SEARCH_CONFIG") or str(_config_path.parent / "local_search.yaml")
+        ).expanduser()
+        if override_path.exists():
+            with override_path.open('r', encoding='utf-8') as f:
+                override_config = yaml.safe_load(f) or {}
+            if not isinstance(override_config, dict):
+                raise ValueError(f"La configuración local debe ser un mapping YAML: {override_path}")
+            base_config = _merge_config(base_config, override_config)
+            logger.info("Overrides locales cargados desde %s", override_path)
+
+        _cached_config = base_config
+        logger.debug("Configuración cargada desde %s", _config_path)
+        return _cached_config
     except yaml.YAMLError as e:
         logger.error(f"Error parseando YAML: {e}")
+        raise
+    except ValueError as e:
+        logger.error("Configuración inválida: %s", e)
         raise
     except Exception as e:
         logger.error(f"Error leyendo archivo de configuración: {e}")

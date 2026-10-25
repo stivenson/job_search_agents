@@ -8,27 +8,33 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-# Directorio base del proyecto
-BASE_DIR = Path(__file__).parent.parent.parent
+# Directorio del proyecto
+PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 # Paths configurables mediante variables de entorno
 CV_PATH_ENV = os.getenv("CV_PATH")
 if CV_PATH_ENV:
     CV_PATH = Path(CV_PATH_ENV)
+    if not CV_PATH.is_absolute():
+        CV_PATH = PROJECT_DIR / CV_PATH
 else:
-    CV_PATH = BASE_DIR / "CVs_Principales" / "CV_Dev_Senior_AI_Improvement.md"
+    CV_PATH = PROJECT_DIR / "cv" / "resume.md"
 
 OUTPUT_DIR_ENV = os.getenv("OUTPUT_DIR")
 if OUTPUT_DIR_ENV:
     OUTPUT_DIR = Path(OUTPUT_DIR_ENV)
+    if not OUTPUT_DIR.is_absolute():
+        OUTPUT_DIR = PROJECT_DIR / OUTPUT_DIR
 else:
-    OUTPUT_DIR = BASE_DIR / "job_search_agents" / "results"
+    OUTPUT_DIR = PROJECT_DIR / "results"
 
 DATA_DIR_ENV = os.getenv("DATA_DIR")
 if DATA_DIR_ENV:
     DATA_DIR = Path(DATA_DIR_ENV)
+    if not DATA_DIR.is_absolute():
+        DATA_DIR = PROJECT_DIR / DATA_DIR
 else:
-    DATA_DIR = BASE_DIR / "job_search_agents" / "data"
+    DATA_DIR = PROJECT_DIR / "data"
 
 # Crear directorios si no existen
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -37,8 +43,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # LLM Configuration
 OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
 ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
-LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # "openai" or "anthropic"
-LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")  # Default to cost-effective model
+HF_TOKEN: Optional[str] = os.getenv("HF_TOKEN")
+HF_API_BASE_URL: str = os.getenv("HF_API_BASE_URL", "https://router.huggingface.co/v1")
+HF_PLANNER_MODEL: str = os.getenv("HF_PLANNER_MODEL", "moonshotai/Kimi-K3")
+HF_EXTRACTOR_MODEL: str = os.getenv("HF_EXTRACTOR_MODEL", "Qwen/Qwen3.6-27B")
+HF_MODEL_ROUTE: str = os.getenv("HF_MODEL_ROUTE", "fastest")
+HF_TIMEOUT_SECONDS: int = int(os.getenv("HF_TIMEOUT_SECONDS", "90"))
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai").lower()
+LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
 
 # Validar que la API key correspondiente al proveedor esté configurada
 if LLM_PROVIDER.lower() == "anthropic" and not ANTHROPIC_API_KEY:
@@ -51,6 +63,13 @@ elif LLM_PROVIDER.lower() == "openai" and not OPENAI_API_KEY:
         "OPENAI_API_KEY environment variable is required when LLM_PROVIDER=openai. "
         "Please set it in your .env file or environment variables."
     )
+elif LLM_PROVIDER == "huggingface" and not HF_TOKEN:
+    raise ValueError(
+        "HF_TOKEN environment variable is required when LLM_PROVIDER=huggingface. "
+        "Please set it in your .env file or environment variables."
+    )
+elif LLM_PROVIDER not in {"openai", "anthropic", "huggingface"}:
+    raise ValueError("LLM_PROVIDER must be openai, anthropic, or huggingface.")
 
 # Job Board API Keys (opcionales)
 LINKEDIN_API_KEY: Optional[str] = os.getenv("LINKEDIN_API_KEY")

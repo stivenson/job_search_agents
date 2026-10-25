@@ -2,16 +2,12 @@
 
 import logging
 from typing import List, Dict, Optional
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.skill_loader import SkillLoader
-from config.settings import (
-    LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY
-)
+from utils.llm_factory import create_chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -20,20 +16,8 @@ class KeywordGeneratorAgent:
     """Agente que usa LLM para generar keywords de búsqueda adaptados dinámicamente."""
     
     def __init__(self):
-        # Inicializar LLM según configuración
-        if LLM_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
-            self.llm = ChatAnthropic(
-                model=LLM_MODEL if "claude" in LLM_MODEL.lower() else "claude-3-5-sonnet-20241022",
-                temperature=0.8  # Mayor creatividad para sinónimos
-            )
-        elif OPENAI_API_KEY:
-            self.llm = ChatOpenAI(
-                model=LLM_MODEL,
-                temperature=0.8
-            )
-        else:
-            logger.warning("No hay API key configurada, usando keywords por defecto")
-            self.llm = None
+        # Usar el modelo de planificación configurado para generar keywords.
+        self.llm = create_chat_model(purpose="planner", temperature=0.8)
         
         # Cargar skill para template de prompt
         skill_loader = SkillLoader()
@@ -84,6 +68,10 @@ class KeywordGeneratorAgent:
         years = len(experience) if isinstance(experience, list) else 0
         if years > 0:
             summary_parts.append(f"Experiencia aproximada: {min(years, 15)}+ años")
+
+        experience_text = profile.get('experience_text', '')
+        if experience_text and not experience:
+            summary_parts.append(f"Experiencia profesional: {experience_text[:1200]}")
         
         return " | ".join(summary_parts) if summary_parts else "Perfil técnico"
     

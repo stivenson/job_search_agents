@@ -1,0 +1,25 @@
+# Copia este archivo a config/local_search.yaml y personaliza sus valores.
+# local_search.yaml está excluido de Git: no incluyas datos que quieras publicar.
+keywords:
+  - "YOUR_ROLE_OR_SKILL"
+
+search_regions:
+  hispanic_countries:
+    - "YOUR_CITY, YOUR_REGION, YOUR_COUNTRY"
+  english_countries: []
+
+matching:
+  # Nombres alternativos que pueden aparecer en las ubicaciones de las ofertas.
+  locality_terms:
+    - "YOUR_CITY"
+    - "YOUR_REGION"
+  # Agrupa sinónimos para adaptar el puntaje a tu objetivo.
+  relevant_keyword_groups: {}
+
+job_sources:
+  computrabajo:
+    enabled: false
+    base_url: "https://co.computrabajo.com"
+    search_path_template: "/trabajo-de-{keyword}-en-{city}"
+    max_results: 50
+    max_keywords: 8

@@ -6,14 +6,10 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 from utils.skill_loader import SkillLoader
-from config.settings import (
-    LLM_PROVIDER, LLM_MODEL, OPENAI_API_KEY, ANTHROPIC_API_KEY,
-    USE_QUERY_VARIATIONS
-)
+from config.settings import USE_QUERY_VARIATIONS
+from utils.llm_factory import create_chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -38,21 +34,11 @@ class QueryVariator:
         self.prompt_template = None
         
         if self.enabled:
-            if LLM_PROVIDER == "anthropic" and ANTHROPIC_API_KEY:
-                try:
-                    self.llm = ChatAnthropic(
-                        model=LLM_MODEL if "claude" in LLM_MODEL.lower() else "claude-3-5-sonnet-20241022",
-                        temperature=0.7  # Más creatividad para variaciones
-                    )
-                    logger.debug("QueryVariator inicializado con Anthropic")
-                except Exception as e:
-                    logger.warning(f"Error inicializando Anthropic para QueryVariator: {e}")
-            elif OPENAI_API_KEY:
-                try:
-                    self.llm = ChatOpenAI(model=LLM_MODEL, temperature=0.7)
-                    logger.debug("QueryVariator inicializado con OpenAI")
-                except Exception as e:
-                    logger.warning(f"Error inicializando OpenAI para QueryVariator: {e}")
+            try:
+                self.llm = create_chat_model(purpose="planner", temperature=0.7)
+                logger.debug("QueryVariator inicializado con el proveedor LLM configurado")
+            except Exception as e:
+                logger.warning(f"Error inicializando modelo para QueryVariator: {e}")
             
             if not self.llm:
                 logger.warning("QueryVariator habilitado pero sin LLM disponible, usando fallback")

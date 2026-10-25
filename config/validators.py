@@ -10,6 +10,8 @@ class JobSourceConfig(BaseModel):
     use_api: bool = False
     max_results: int = Field(default=50, gt=0, le=1000)
     base_url: str
+    search_path_template: Optional[str] = None
+    max_keywords: Optional[int] = Field(default=None, gt=0, le=50)
     
     @validator('max_results')
     def max_results_valid(cls, v):

@@ -1,17 +1,21 @@
 """Orquestador principal usando LangGraph para coordinar todos los agentes."""
 
+import hashlib
+import json
 import logging
 import asyncio
+import shelve
 import sys
-from typing import TypedDict, List, Dict
+import time as time_module
+from typing import TypedDict, List, Dict, Optional
 from pathlib import Path
 from langgraph.graph import StateGraph, END
-import yaml
 
 # Agregar directorio padre al path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agents.linkedin_agent import LinkedInAgent
+from agents.computrabajo_agent import ComputrabajoAgent
 # from agents.indeed_agent import IndeedAgent  # Deshabilitado: difícil acceso
 from agents.remote_jobs_agent import RemoteJobsAgent
 from agents.tech_jobs_agent import TechJobsAgent
@@ -20,14 +24,16 @@ from agents.email_extractor_agent import EmailExtractorAgent
 from agents.matcher_agent import MatcherAgent
 from agents.keyword_generator_agent import KeywordGeneratorAgent
 from agents.semantic_matcher_agent import SemanticMatcherAgent
+from config.config_loader import load_job_sources_config
 from utils.cv_parser import CVParser
 from utils.progress_logger import get_progress_logger
 from utils.exceptions import CVParseError, ScrapingError, LLMError
 from config.settings import (
-    DATA_DIR, OUTPUT_DIR, 
+    DATA_DIR, OUTPUT_DIR,
     USE_ADAPTIVE_KEYWORDS, USE_SEMANTIC_MATCHING,
     SEMANTIC_MATCHING_THRESHOLD, SEMANTIC_MAX_JOBS,
-    SEMANTIC_WEIGHT, HEURISTIC_WEIGHT
+    SEMANTIC_WEIGHT, HEURISTIC_WEIGHT,
+    USE_CACHE, CACHE_EXPIRY_HOURS
 )
 
 logger = logging.getLogger(__name__)
@@ -49,6 +55,7 @@ class JobSearchOrchestrator:
     
     def __init__(self):
         self.linkedin_agent = LinkedInAgent()
+        self.computrabajo_agent = ComputrabajoAgent()
         # self.indeed_agent = IndeedAgent()  # Deshabilitado: difícil acceso
         self.remote_agent = RemoteJobsAgent()
         self.tech_agent = TechJobsAgent()
@@ -60,16 +67,54 @@ class JobSearchOrchestrator:
         self.semantic_matcher = SemanticMatcherAgent()
         
         # Cargar configuración
-        config_path = Path(__file__).parent.parent / "config" / "job_sources.yaml"
-        if config_path.exists():
-            with open(config_path, 'r', encoding='utf-8') as f:
-                self.config = yaml.safe_load(f)
-        else:
-            self.config = {}
+        self.config = load_job_sources_config()
         
         # Construir grafo
         self.graph = self._build_graph()
-    
+
+    # ------------------------------------------------------------------
+    # Caché de búsquedas
+    # ------------------------------------------------------------------
+
+    def _cache_key(self, keywords: List[str], region: str) -> str:
+        """Genera una clave de caché reproducible para keywords + región."""
+        sources = sorted(
+            name for name, settings in self.config.get('job_sources', {}).items()
+            if settings.get('enabled', True)
+        )
+        countries = self.config.get('search_regions', {}).get(f'{region}_countries', [])
+        payload = json.dumps(
+            {'keywords': sorted(keywords), 'region': region, 'sources': sources, 'countries': countries},
+            sort_keys=True,
+        )
+        return hashlib.md5(payload.encode()).hexdigest()
+
+    def _load_cached_jobs(self, cache_key: str) -> Optional[List[Dict]]:
+        """Devuelve trabajos cacheados si existen y no han expirado."""
+        cache_path = str(DATA_DIR / "search_cache")
+        try:
+            with shelve.open(cache_path) as cache:
+                if cache_key in cache:
+                    entry = cache[cache_key]
+                    age_hours = (time_module.time() - entry['timestamp']) / 3600
+                    if age_hours < CACHE_EXPIRY_HOURS:
+                        logger.info(f"Caché hit (hace {age_hours:.1f}h): {len(entry['jobs'])} trabajos")
+                        return entry['jobs']
+                    logger.info(f"Caché expirado (hace {age_hours:.1f}h), regenerando...")
+        except Exception as e:
+            logger.warning(f"Error leyendo caché: {e}")
+        return None
+
+    def _save_cached_jobs(self, cache_key: str, jobs: List[Dict]) -> None:
+        """Guarda trabajos en caché con timestamp actual."""
+        cache_path = str(DATA_DIR / "search_cache")
+        try:
+            with shelve.open(cache_path) as cache:
+                cache[cache_key] = {'jobs': jobs, 'timestamp': time_module.time()}
+            logger.info(f"Caché guardado: {len(jobs)} trabajos")
+        except Exception as e:
+            logger.warning(f"Error guardando caché: {e}")
+
     def _build_graph(self) -> StateGraph:
         """Construye el grafo de LangGraph."""
         workflow = StateGraph(JobSearchState)
@@ -143,6 +188,15 @@ class JobSearchOrchestrator:
     async def _search_by_region(self, region_type: str, keywords: List[str]) -> List[Dict]:
         """Busca trabajos en una región específica con keywords adaptativos."""
         progress_logger = get_progress_logger()
+
+        # Verificar caché antes de buscar
+        if USE_CACHE:
+            cache_key = self._cache_key(keywords, region_type)
+            cached = self._load_cached_jobs(cache_key)
+            if cached is not None:
+                progress_logger.print_info(f"Usando caché para región '{region_type}' ({len(cached)} trabajos)")
+                return cached
+
         region_config = self.config.get('search_regions', {})
         countries = region_config.get(f"{region_type}_countries", [])
         
@@ -164,6 +218,8 @@ class JobSearchOrchestrator:
             sources_to_generate = []
             if self.config.get('job_sources', {}).get('linkedin', {}).get('enabled', True):
                 sources_to_generate.append('linkedin')
+            if self.config.get('job_sources', {}).get('computrabajo', {}).get('enabled', True):
+                sources_to_generate.append('computrabajo')
             if self.config.get('job_sources', {}).get('remoteok', {}).get('enabled', True):
                 sources_to_generate.append('remoteok')
             if self.config.get('job_sources', {}).get('stack_overflow', {}).get('enabled', True):
@@ -201,6 +257,7 @@ class JobSearchOrchestrator:
             # Sin perfil, usar keywords base
             adaptive_keywords = {
                 'linkedin': keywords,
+                'computrabajo': keywords,
                 'remoteok': keywords,
                 'stackoverflow': keywords,
                 'findjobit': keywords
@@ -211,6 +268,15 @@ class JobSearchOrchestrator:
             linkedin_keywords = adaptive_keywords.get('linkedin', keywords)
             tasks.append(self.linkedin_agent.search(linkedin_keywords, countries=countries))
             source_names.append("LinkedIn")
+
+        if self.config.get('job_sources', {}).get('computrabajo', {}).get('enabled', True):
+            computrabajo_keywords = adaptive_keywords.get('computrabajo', keywords)
+            tasks.append(self.computrabajo_agent.search(
+                computrabajo_keywords,
+                countries=countries,
+                region_type=region_type,
+            ))
+            source_names.append("Computrabajo")
         
         # Indeed deshabilitado: difícil acceso, bloqueos frecuentes
         # if self.config.get('job_sources', {}).get('indeed', {}).get('enabled', True):
@@ -254,15 +320,52 @@ class JobSearchOrchestrator:
                     all_jobs.extend(result)
             
             progress_logger.stop_progress()
-        
+
+        all_jobs = self._deduplicate_jobs(all_jobs)
+
+        # Guardar en caché para próximas ejecuciones
+        if USE_CACHE and all_jobs:
+            self._save_cached_jobs(cache_key, all_jobs)
+
         return all_jobs
-    
+
+    def _deduplicate_jobs(self, jobs: List[Dict]) -> List[Dict]:
+        """Elimina duplicados entre búsquedas y fuentes usando URL canónica."""
+        from urllib.parse import urlparse, urlunsplit
+
+        unique: List[Dict] = []
+        seen = set()
+        for job in jobs:
+            url = (job.get('url') or '').strip()
+            if url:
+                parsed = urlparse(url)
+                key = ('url', urlunsplit((parsed.scheme, parsed.netloc.lower(), parsed.path.rstrip('/'), '', '')))
+            else:
+                normalize = lambda value: ' '.join(str(value or '').casefold().split())
+                key = (
+                    'text',
+                    normalize(job.get('source')),
+                    normalize(job.get('title')),
+                    normalize(job.get('company')),
+                    normalize(job.get('location')),
+                )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(job)
+        if len(unique) != len(jobs):
+            logger.info("Deduplicación global: %s filas repetidas eliminadas", len(jobs) - len(unique))
+        return unique
+
     def _parse_profile(self, state: JobSearchState) -> JobSearchState:
         """Parsea el CV y extrae el perfil con generación dinámica de keywords."""
         progress_logger = get_progress_logger()
         progress_logger.print_info("Parseando perfil del CV...")
         try:
             profile = self.cv_parser.parse()
+            # MatcherAgent is initialized before the CV is parsed; update its
+            # in-memory profile so this run uses the freshly extracted CV data.
+            self.matcher.profile = profile
             base_keywords = self.config.get('keywords', [])
             
             state['profile'] = profile
@@ -402,6 +505,7 @@ class JobSearchOrchestrator:
         progress_logger = get_progress_logger()
         jobs = state.get('jobs', [])
         profile = state.get('profile', {})
+        self.matcher.profile = profile
         
         if not jobs:
             state['matched_jobs'] = []
@@ -412,14 +516,19 @@ class JobSearchOrchestrator:
             progress = progress_logger.start_progress()
             match_task = progress.add_task("[cyan]Calculando scores heurísticos...", total=len(jobs))
             
-            # Paso 1: Matching heurístico (rápido)
-            matched_jobs = self.matcher.match_jobs(jobs)
+            # Paso 1: Matching heurístico — ejecutar en thread para no bloquear el event loop
+            matched_jobs = await asyncio.to_thread(self.matcher.match_jobs, jobs)
             progress.update(match_task, completed=len(jobs), description=f"[green]✓ Scores heurísticos calculados")
             
             # Paso 2: Filtrar top trabajos para análisis semántico (si está habilitado)
             # Solo analizar trabajos con score >= threshold o top N, lo que sea menor
             if USE_SEMANTIC_MATCHING:
                 top_jobs = [job for job in matched_jobs if job.get('match_score', 0) >= SEMANTIC_MATCHING_THRESHOLD]
+                # Listing cards often contain only title/company/location and
+                # score below the threshold; still semantically rank the top
+                # candidates instead of silently skipping the LLM stage.
+                if not top_jobs:
+                    top_jobs = matched_jobs[:min(SEMANTIC_MAX_JOBS, 20)]
                 if len(top_jobs) > SEMANTIC_MAX_JOBS:
                     top_jobs = matched_jobs[:SEMANTIC_MAX_JOBS]
             else:
@@ -456,13 +565,16 @@ class JobSearchOrchestrator:
                     if job.get('used_semantic', False) and job.get('semantic_score', 0) > 0:
                         heuristic_score = job.get('heuristic_score', job.get('match_score', 0))
                         semantic_score = job.get('semantic_score', 0)
+                        confidence = job.get('semantic_analysis', {}).get('confidence', 0)
                         combined_score = self.semantic_matcher.combine_scores(
                             heuristic_score,
                             semantic_score,
                             heuristic_weight=HEURISTIC_WEIGHT,
-                            semantic_weight=SEMANTIC_WEIGHT
+                            semantic_weight=SEMANTIC_WEIGHT,
+                            confidence=confidence,
                         )
                         job['match_score'] = combined_score
+                    job['is_relevant'] = job.get('match_score', 0) >= self.matcher.min_score
                 
                 progress.update(semantic_task, completed=len(top_jobs), description="[green]✓ Análisis semántico completado")
                 
